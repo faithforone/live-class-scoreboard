@@ -6,6 +6,7 @@ const { sequelize } = require('./models');
 const adminRoutes = require('./routes/admin');
 const teacherRoutes = require('./routes/teacher');
 const viewerRoutes = require('./routes/viewer');
+const templateRoutes = require('./routes/api/templates');
 
 const app = express();
 
@@ -18,6 +19,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/admin', adminRoutes);
 app.use('/api/teacher', teacherRoutes);
 app.use('/api/viewer', viewerRoutes);
+app.use('/api/templates', templateRoutes);
 
 // 기본 라우트
 app.get('/', (req, res) => {

@@ -18,6 +18,10 @@ router.post('/groups', adminController.createGroup);
 router.put('/groups/:group_id', adminController.updateGroup);
 router.delete('/groups/:group_id', adminController.deleteGroup);
 
+// 그룹-학생 연결 관리
+router.post('/groups/:group_id/students', adminController.addStudentToGroup);
+router.delete('/groups/:group_id/students/:student_id', adminController.removeStudentFromGroup);
+
 // 비밀번호 관리
 router.post('/password', adminController.updatePassword);
 

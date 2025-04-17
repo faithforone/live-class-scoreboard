@@ -1,4 +1,4 @@
-const { Student, Group, ClassSession, ScoreLog, SystemSetting, sequelize } = require('../models');
+const { Student, Group, ClassSession, ScoreLog, SystemSetting, sequelize, StudentGroup } = require('../models');
 const bcrypt = require('bcrypt');
 
 // 학생 목록 조회
@@ -8,8 +8,8 @@ exports.getAllStudents = async (req, res) => {
       include: [
         {
           model: Group,
-          as: 'group',
-          attributes: ['group_id', 'name']
+          as: 'groups',
+          through: { attributes: [] } // Don't include junction table attributes
         }
       ],
       order: [['name', 'ASC']]
@@ -24,21 +24,48 @@ exports.getAllStudents = async (req, res) => {
 
 // 학생 등록
 exports.createStudent = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  
   try {
-    const { name, group_id } = req.body;
+    const { name, groupIds } = req.body;
     
     if (!name) {
       return res.status(400).json({ message: '학생 이름은 필수 항목입니다.' });
     }
     
+    // Create student
     const newStudent = await Student.create({
       name,
-      group_id: group_id || null,
       status: '대기중'
+    }, { transaction });
+    
+    // Associate student with groups if groupIds are provided
+    if (groupIds && groupIds.length > 0) {
+      // Create associations in the junction table
+      const groupAssociations = groupIds.map(groupId => ({
+        studentId: newStudent.id,
+        groupId
+      }));
+      
+      await StudentGroup.bulkCreate(groupAssociations, { transaction });
+    }
+    
+    await transaction.commit();
+    
+    // Fetch the student with its groups to return in the response
+    const studentWithGroups = await Student.findByPk(newStudent.id, {
+      include: [
+        {
+          model: Group,
+          as: 'groups',
+          through: { attributes: [] }
+        }
+      ]
     });
     
-    res.status(201).json(newStudent);
+    res.status(201).json(studentWithGroups);
   } catch (error) {
+    await transaction.rollback();
     console.error('학생 등록 오류:', error);
     res.status(500).json({ message: '학생 등록 중 오류가 발생했습니다.' });
   }
@@ -46,23 +73,59 @@ exports.createStudent = async (req, res) => {
 
 // 학생 정보 수정
 exports.updateStudent = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  
   try {
     const { student_id } = req.params;
-    const { name, group_id } = req.body;
+    const { name, groupIds } = req.body;
     
     const student = await Student.findByPk(student_id);
     
     if (!student) {
+      await transaction.rollback();
       return res.status(404).json({ message: '학생을 찾을 수 없습니다.' });
     }
     
-    await student.update({
-      name: name || student.name,
-      group_id: group_id !== undefined ? group_id : student.group_id
+    // Update student name if provided
+    if (name) {
+      await student.update({ name }, { transaction });
+    }
+    
+    // Update group associations if groupIds are provided
+    if (groupIds !== undefined) {
+      // Remove all current group associations
+      await StudentGroup.destroy({
+        where: { studentId: student_id },
+        transaction
+      });
+      
+      // Create new associations if there are any groups
+      if (groupIds && groupIds.length > 0) {
+        const groupAssociations = groupIds.map(groupId => ({
+          studentId: student_id,
+          groupId
+        }));
+        
+        await StudentGroup.bulkCreate(groupAssociations, { transaction });
+      }
+    }
+    
+    await transaction.commit();
+    
+    // Fetch the updated student with its groups
+    const updatedStudent = await Student.findByPk(student_id, {
+      include: [
+        {
+          model: Group,
+          as: 'groups',
+          through: { attributes: [] }
+        }
+      ]
     });
     
-    res.status(200).json(student);
+    res.status(200).json(updatedStudent);
   } catch (error) {
+    await transaction.rollback();
     console.error('학생 정보 수정 오류:', error);
     res.status(500).json({ message: '학생 정보 수정 중 오류가 발생했습니다.' });
   }
@@ -70,24 +133,38 @@ exports.updateStudent = async (req, res) => {
 
 // 학생 삭제
 exports.deleteStudent = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  
   try {
     const { student_id } = req.params;
     
     const student = await Student.findByPk(student_id);
     
     if (!student) {
+      await transaction.rollback();
       return res.status(404).json({ message: '학생을 찾을 수 없습니다.' });
     }
     
     // 활성 세션에 참여 중인지 확인
     if (student.status === '수업중') {
+      await transaction.rollback();
       return res.status(400).json({ message: '현재 수업 중인 학생은 삭제할 수 없습니다.' });
     }
     
-    await student.destroy();
+    // First delete all associations in the junction table
+    await StudentGroup.destroy({
+      where: { studentId: student_id },
+      transaction
+    });
+    
+    // Then delete the student
+    await student.destroy({ transaction });
+    
+    await transaction.commit();
     
     res.status(200).json({ message: '학생이 삭제되었습니다.' });
   } catch (error) {
+    await transaction.rollback();
     console.error('학생 삭제 오류:', error);
     res.status(500).json({ message: '학생 삭제 중 오류가 발생했습니다.' });
   }
@@ -97,6 +174,14 @@ exports.deleteStudent = async (req, res) => {
 exports.getAllGroups = async (req, res) => {
   try {
     const groups = await Group.findAll({
+      include: [
+        {
+          model: Student,
+          as: 'students',
+          through: { attributes: [] }, // Don't include junction table attributes
+          attributes: ['id', 'name'] // Only include necessary attributes
+        }
+      ],
       order: [['name', 'ASC']]
     });
     
@@ -118,7 +203,13 @@ exports.createGroup = async (req, res) => {
     
     const newGroup = await Group.create({ name });
     
-    res.status(201).json(newGroup);
+    // Return the group with empty students array for consistency
+    const groupWithStudents = {
+      ...newGroup.toJSON(),
+      students: []
+    };
+    
+    res.status(201).json(groupWithStudents);
   } catch (error) {
     console.error('그룹 생성 오류:', error);
     res.status(500).json({ message: '그룹 생성 중 오류가 발생했습니다.' });
@@ -131,7 +222,16 @@ exports.updateGroup = async (req, res) => {
     const { group_id } = req.params;
     const { name } = req.body;
     
-    const group = await Group.findByPk(group_id);
+    const group = await Group.findByPk(group_id, {
+      include: [
+        {
+          model: Student,
+          as: 'students',
+          through: { attributes: [] },
+          attributes: ['id', 'name']
+        }
+      ]
+    });
     
     if (!group) {
       return res.status(404).json({ message: '그룹을 찾을 수 없습니다.' });
@@ -148,28 +248,38 @@ exports.updateGroup = async (req, res) => {
 
 // 그룹 삭제
 exports.deleteGroup = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  
   try {
     const { group_id } = req.params;
     
     const group = await Group.findByPk(group_id);
     
     if (!group) {
+      await transaction.rollback();
       return res.status(404).json({ message: '그룹을 찾을 수 없습니다.' });
     }
     
-    // 그룹에 속한 학생 수 확인
-    const studentCount = await Student.count({ where: { group_id } });
+    // 그룹에 속한 학생 수 확인 (junction table)
+    const studentCount = await StudentGroup.count({
+      where: { groupId: group_id }
+    });
     
     if (studentCount > 0) {
+      await transaction.rollback();
       return res.status(400).json({ 
         message: '그룹에 속한 학생이 있습니다. 먼저 학생들을 다른 그룹으로 이동하거나 그룹에서 제외하세요.' 
       });
     }
     
-    await group.destroy();
+    // Delete the group
+    await group.destroy({ transaction });
+    
+    await transaction.commit();
     
     res.status(200).json({ message: '그룹이 삭제되었습니다.' });
   } catch (error) {
+    await transaction.rollback();
     console.error('그룹 삭제 오류:', error);
     res.status(500).json({ message: '그룹 삭제 중 오류가 발생했습니다.' });
   }
@@ -202,6 +312,97 @@ exports.updatePassword = async (req, res) => {
   } catch (error) {
     console.error('비밀번호 업데이트 오류:', error);
     res.status(500).json({ message: '비밀번호 업데이트 중 오류가 발생했습니다.' });
+  }
+};
+
+// 그룹에 학생 추가
+exports.addStudentToGroup = async (req, res) => {
+  try {
+    const { group_id } = req.params;
+    const { studentId } = req.body;
+    
+    // Check if group exists
+    const group = await Group.findByPk(group_id);
+    if (!group) {
+      return res.status(404).json({ message: '그룹을 찾을 수 없습니다.' });
+    }
+    
+    // Check if student exists
+    const student = await Student.findByPk(studentId);
+    if (!student) {
+      return res.status(404).json({ message: '학생을 찾을 수 없습니다.' });
+    }
+    
+    // Check if association already exists
+    const existingAssociation = await StudentGroup.findOne({
+      where: { studentId, groupId: group_id }
+    });
+    
+    if (existingAssociation) {
+      return res.status(400).json({ message: '이미 그룹에 속한 학생입니다.' });
+    }
+    
+    // Create association
+    await StudentGroup.create({
+      studentId,
+      groupId: group_id
+    });
+    
+    // Get updated group with students
+    const updatedGroup = await Group.findByPk(group_id, {
+      include: [
+        {
+          model: Student,
+          as: 'students',
+          through: { attributes: [] },
+          attributes: ['id', 'name']
+        }
+      ]
+    });
+    
+    res.status(200).json(updatedGroup);
+  } catch (error) {
+    console.error('그룹에 학생 추가 오류:', error);
+    res.status(500).json({ message: '그룹에 학생을 추가하는 중 오류가 발생했습니다.' });
+  }
+};
+
+// 그룹에서 학생 제거
+exports.removeStudentFromGroup = async (req, res) => {
+  try {
+    const { group_id, student_id } = req.params;
+    
+    // Check if association exists
+    const association = await StudentGroup.findOne({
+      where: {
+        groupId: group_id,
+        studentId: student_id
+      }
+    });
+    
+    if (!association) {
+      return res.status(404).json({ message: '그룹에 속한 학생을 찾을 수 없습니다.' });
+    }
+    
+    // Delete association
+    await association.destroy();
+    
+    // Get updated group with students
+    const updatedGroup = await Group.findByPk(group_id, {
+      include: [
+        {
+          model: Student,
+          as: 'students',
+          through: { attributes: [] },
+          attributes: ['id', 'name']
+        }
+      ]
+    });
+    
+    res.status(200).json(updatedGroup);
+  } catch (error) {
+    console.error('그룹에서 학생 제거 오류:', error);
+    res.status(500).json({ message: '그룹에서 학생을 제거하는 중 오류가 발생했습니다.' });
   }
 };
 

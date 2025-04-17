@@ -12,6 +12,14 @@ module.exports = (sequelize, DataTypes) => {
         otherKey: 'studentId',   // 중간 테이블의 학생 ID 외래 키
         as: 'students'           // 관계 접근 시 사용할 별칭 (컨트롤러 로직과 일치)
       });
+
+      // 그룹은 여러 템플릿에 속할 수 있음 (N:M)
+      Group.belongsToMany(models.Template, {
+        through: 'TemplateGroup',
+        foreignKey: 'groupId',
+        otherKey: 'templateId',
+        as: 'templates'
+      });
     }
   }
   Group.init({
