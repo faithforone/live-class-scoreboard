@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken');
 const { SystemSetting } = require('../models');
 
 // Authentication middleware
-module.exports = async function (req, res, next) {
+const auth = async function (req, res, next) {
   // Get token from header
   const token = req.header('x-auth-token');
 
@@ -48,4 +48,6 @@ module.exports = async function (req, res, next) {
     console.error('Token verification error:', err);
     res.status(401).json({ message: 'Token is not valid' });
   }
-}; 
+};
+
+module.exports = { auth }; 

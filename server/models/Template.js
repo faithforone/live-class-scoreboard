@@ -5,9 +5,10 @@ module.exports = (sequelize, DataTypes) => {
     static associate(models) {
       // Define association with Group model
       Template.belongsToMany(models.Group, {
-        through: 'TemplateGroups',
+        through: 'template_groups',
         foreignKey: 'templateId',
-        otherKey: 'groupId'
+        otherKey: 'groupId',
+        as: 'groups'
       });
     }
   }

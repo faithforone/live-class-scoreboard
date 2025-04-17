@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { check } = require('express-validator');
-const auth = require('../../middleware/auth');
+const { auth } = require('../../middleware/auth');
 const templateController = require('../../controllers/templateController');
 
 // @route   GET api/templates
@@ -32,7 +32,17 @@ router.post(
 // @route   PUT api/templates/:id
 // @desc    Update a template
 // @access  Private
-router.put('/:id', auth, templateController.updateTemplate);
+router.put(
+  '/:id', 
+  [
+    auth,
+    [
+      check('name', 'Name must be a string').optional().isString(),
+      check('metrics', 'Metrics must be an array').optional().isArray()
+    ]
+  ],
+  templateController.updateTemplate
+);
 
 // @route   DELETE api/templates/:id
 // @desc    Delete a template

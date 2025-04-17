@@ -15,7 +15,7 @@ module.exports = (sequelize, DataTypes) => {
 
       // 그룹은 여러 템플릿에 속할 수 있음 (N:M)
       Group.belongsToMany(models.Template, {
-        through: 'TemplateGroup',
+        through: 'template_groups',
         foreignKey: 'groupId',
         otherKey: 'templateId',
         as: 'templates'

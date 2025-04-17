@@ -75,6 +75,11 @@ const createTemplate = async (req, res) => {
  * @access  Private
  */
 const updateTemplate = async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+  
   const { name, description, metrics, isActive } = req.body;
   
   try {
