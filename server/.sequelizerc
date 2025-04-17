@@ -1,0 +1,20 @@
+// live-class-scoreboard/server/.sequelizerc
+
+const path = require('path');
+
+// .env 파일 로드를 최상단에 추가
+require('dotenv').config(); // NODE_ENV 에 따른 .env 파일 로드 등 필요 시 옵션 추가 가능
+
+module.exports = {
+  // Sequelize 설정 파일 경로
+  'config': path.resolve('config', 'config.js'),
+
+  // 모델 파일들이 있는 경로
+  'models-path': path.resolve('models'),
+
+  // 시더 파일들이 있는 경로
+  'seeders-path': path.resolve('seeders'),
+
+  // 마이그레이션 파일들이 있는 경로
+  'migrations-path': path.resolve('migrations')
+};

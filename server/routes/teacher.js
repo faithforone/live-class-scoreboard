@@ -1,22 +1,23 @@
+// live-class-scoreboard/server/routes/teacher.js
+
 const express = require('express');
 const router = express.Router();
-// auth 미들웨어를 가져옵니다.
-const { verifyTeacherPassword } = require('../middlewares/auth');
+// auth 미들웨어에서 verifyTeacherToken 함수를 import 합니다.
+const { verifyTeacherToken } = require('../middlewares/auth'); // <<< 수정: verifyTeacherToken import
+// const { verifyTeacherPassword } = require('../middlewares/auth'); // 이전 import 는 제거하거나 주석처리
 
 // teacherController 객체 전체를 가져옵니다.
 const teacherController = require('../controllers/teacherController');
 
-// 선생님 인증 미들웨어 적용 (이 라우터의 모든 경로에 적용)
-router.use(verifyTeacherPassword);
-
 // --- 로그인 라우트 ---
-// (verifyTeacherPassword를 통과하면 성공으로 간주)
-router.post('/login', (req, res) => {
-  res.status(200).json({ message: 'Teacher login successful' });
-});
+// 로그인은 인증 미들웨어 적용 전에 처리해야 합니다.
+router.post('/login', teacherController.login);
+
+// --- 이하 모든 라우트에 선생님 JWT 토큰 인증 미들웨어 적용 ---
+router.use(verifyTeacherToken); // <<< 수정: import 한 verifyTeacherToken 사용
 
 // --- 학생 관련 라우트 ---
-// teacherController 객체를 통해 함수를 참조합니다.
+// (이제 자동으로 verifyTeacherToken 미들웨어가 적용됩니다)
 router.get('/students', teacherController.getAllStudents);
 router.get('/available-students', teacherController.getAvailableStudents);
 
