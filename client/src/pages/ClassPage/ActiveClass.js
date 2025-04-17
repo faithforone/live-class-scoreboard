@@ -10,7 +10,6 @@ function ActiveClass() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [points, setPoints] = useState({}); // Map of studentId -> points to award
   const [submitting, setSubmitting] = useState(false);
   
   // Fetch session data
@@ -26,14 +25,6 @@ function ActiveClass() {
         }
         
         setSession(activeSession);
-        
-        // Initialize points map for all students
-        const initialPoints = {};
-        activeSession.sessionParticipants.forEach(participant => {
-          initialPoints[participant.studentId] = 0;
-        });
-        setPoints(initialPoints);
-        
       } catch (err) {
         console.error('Error fetching session:', err);
         
@@ -55,49 +46,35 @@ function ActiveClass() {
     fetchSessionData();
   }, [sessionId]);
   
-  // Handle point change for a student
-  const handlePointChange = (studentId, value) => {
-    setPoints(prev => ({
-      ...prev,
-      [studentId]: parseInt(value) || 0
-    }));
-  };
-  
   // Quick award points to a student
   const handleQuickPoints = async (studentId, pointsValue) => {
     try {
       setSubmitting(true);
+      // Make the API call to update the score
       await teacherService.updateScore(session.id, studentId, pointsValue);
       
-      // Refresh session data
-      const updatedSession = await teacherService.getMyActiveSession();
-      setSession(updatedSession);
-    } catch (err) {
-      console.error('Error awarding points:', err);
-      alert('점수 부여 중 오류가 발생했습니다.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-  
-  // Award points to a student
-  const handleAwardPoints = async (studentId) => {
-    if (!points[studentId]) return;
-    
-    try {
-      setSubmitting(true);
-      await teacherService.updateScore(session.id, studentId, points[studentId]);
-      
-      // Refresh session data
-      const updatedSession = await teacherService.getMyActiveSession();
-      setSession(updatedSession);
-      
-      // Reset points for this student
-      setPoints(prev => ({
-        ...prev,
-        [studentId]: 0
+      // Immediately update the UI without waiting for a full refresh
+      setSession(prevSession => ({
+        ...prevSession,
+        sessionParticipants: prevSession.sessionParticipants.map(participant => {
+          if (participant.studentId === studentId) {
+            return {
+              ...participant,
+              score: participant.score + pointsValue
+            };
+          }
+          return participant;
+        })
       }));
       
+      // Optional: refresh the full session data in background
+      teacherService.getMyActiveSession()
+        .then(updatedSession => {
+          if (updatedSession) {
+            setSession(updatedSession);
+          }
+        })
+        .catch(err => console.error('Background refresh error:', err));
     } catch (err) {
       console.error('Error awarding points:', err);
       alert('점수 부여 중 오류가 발생했습니다.');
@@ -121,6 +98,12 @@ function ActiveClass() {
     } finally {
       setSubmitting(false);
     }
+  };
+  
+  // Generate QR code URL for feed page
+  const getFeedQRUrl = () => {
+    const feedUrl = `${window.location.origin}/feed/${session.urlIdentifier || session.url_identifier}`;
+    return `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(feedUrl)}`;
   };
   
   if (loading) return <div className="loading">로딩 중...</div>;
@@ -150,89 +133,51 @@ function ActiveClass() {
       <div className="students-container">
         <h2>참여 학생 ({session.sessionParticipants?.length || 0}명)</h2>
         
-        <table className="students-table">
-          <thead>
-            <tr>
-              <th>이름</th>
-              <th>현재 점수</th>
-              <th>점수 부여</th>
-              <th>동작</th>
-            </tr>
-          </thead>
-          <tbody>
-            {session.sessionParticipants?.sort((a, b) => {
-              // Sort by student name if available
-              if (a.student && b.student) {
-                return a.student.name.localeCompare(b.student.name);
-              }
-              return 0;
-            }).map(participant => (
-              <tr key={participant.id}>
-                <td>{participant.student?.name || '이름 없음'}</td>
-                <td className="score">{participant.score}</td>
-                <td className="points-input">
-                  <div className="quick-buttons">
-                    <button 
-                      className="quick-btn minus"
-                      onClick={() => handleQuickPoints(participant.studentId, -5)}
-                    >-5</button>
-                    <button 
-                      className="quick-btn minus"
-                      onClick={() => handleQuickPoints(participant.studentId, -3)}
-                    >-3</button>
-                    <button 
-                      className="quick-btn minus"
-                      onClick={() => handleQuickPoints(participant.studentId, -1)}
-                    >-1</button>
-                    <button 
-                      className="quick-btn plus"
-                      onClick={() => handleQuickPoints(participant.studentId, 1)}
-                    >+1</button>
-                    <button 
-                      className="quick-btn plus"
-                      onClick={() => handleQuickPoints(participant.studentId, 3)}
-                    >+3</button>
-                    <button 
-                      className="quick-btn plus"
-                      onClick={() => handleQuickPoints(participant.studentId, 5)}
-                    >+5</button>
-                  </div>
-                  <div className="manual-adjust">
-                    <button 
-                      className="point-btn minus"
-                      onClick={() => handlePointChange(participant.studentId, (points[participant.studentId] || 0) - 1)}
-                    >-</button>
-                    <input
-                      type="number"
-                      value={points[participant.studentId] || 0}
-                      onChange={(e) => handlePointChange(participant.studentId, e.target.value)}
-                      min="-100"
-                      max="100"
-                    />
-                    <button 
-                      className="point-btn plus"
-                      onClick={() => handlePointChange(participant.studentId, (points[participant.studentId] || 0) + 1)}
-                    >+</button>
-                  </div>
-                </td>
-                <td>
-                  <button
-                    className="award-btn"
-                    onClick={() => handleAwardPoints(participant.studentId)}
-                    disabled={submitting || !points[participant.studentId]}
-                  >
-                    부여
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="students-grid">
+          {session.sessionParticipants?.sort((a, b) => {
+            // Sort by student name if available
+            if (a.student && b.student) {
+              return a.student.name.localeCompare(b.student.name);
+            }
+            return 0;
+          }).map(participant => (
+            <div key={participant.id} className="student-card">
+              <div className="student-name">{participant.student?.name || '이름 없음'}</div>
+              <div className="student-score">{participant.score}</div>
+              <div className="quick-buttons">
+                <button 
+                  className="quick-btn minus"
+                  onClick={() => handleQuickPoints(participant.studentId, -1)}
+                >-1</button>
+                <button 
+                  className="quick-btn plus"
+                  onClick={() => handleQuickPoints(participant.studentId, 1)}
+                >+1</button>
+                <button 
+                  className="quick-btn minus"
+                  onClick={() => handleQuickPoints(participant.studentId, -3)}
+                >-3</button>
+                <button 
+                  className="quick-btn plus"
+                  onClick={() => handleQuickPoints(participant.studentId, 3)}
+                >+3</button>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
       
       <div className="feed-info">
         <h3>피드 URL</h3>
-        <p>수업 현황 피드: <a href={`/feed/${session.urlIdentifier || session.url_identifier}`} target="_blank" rel="noopener noreferrer">/feed/{session.urlIdentifier || session.url_identifier}</a></p>
+        <div className="feed-access">
+          <div className="feed-qr">
+            <img src={getFeedQRUrl()} alt="Feed QR Code" />
+          </div>
+          <div className="feed-url">
+            <p>수업 현황 피드: <a href={`/feed/${session.urlIdentifier || session.url_identifier}`} target="_blank" rel="noopener noreferrer">/feed/{session.urlIdentifier || session.url_identifier}</a></p>
+            <p>다른 기기에서 QR코드를 스캔하거나 위 URL을 방문하여 실시간 점수 현황을 확인하세요.</p>
+          </div>
+        </div>
       </div>
     </div>
   );

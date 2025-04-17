@@ -1,56 +1,107 @@
-const { ClassSession, Student, ScoreLog, Group, SystemSetting, sequelize } = require('../models');
+const { ClassSession, Student, ScoreLog, Group, SystemSetting, sequelize, SessionParticipant } = require('../models');
 
 // 실시간 점수 피드 데이터 조회
 exports.getSessionFeed = async (req, res) => {
   try {
     const { urlIdentifier } = req.params;
     
+    console.log('피드 요청 URL 식별자:', urlIdentifier);
+    
     if (!urlIdentifier) {
       return res.status(400).json({ message: '세션 식별자가 필요합니다.' });
     }
     
-    // URL 식별자로 세션 찾기
+    // 디버깅용: 모든 세션의 URL 식별자 조회
+    const allSessions = await ClassSession.findAll({
+      attributes: ['id', 'url_identifier'],
+      limit: 10
+    });
+    console.log('데이터베이스의 세션 URL 식별자들:', allSessions.map(s => s.url_identifier));
+    
+    // URL 식별자로 세션 찾기 (url_identifier 필드 사용)
     const session = await ClassSession.findOne({
       where: {
-        feed_url: `/feed/${urlIdentifier}`
+        url_identifier: urlIdentifier
       }
     });
+    
+    console.log('세션 찾음?', !!session);
     
     if (!session) {
       return res.status(404).json({ message: '세션을 찾을 수 없습니다.' });
     }
     
-    // 세션의 점수 로그 조회 (최신 100개)
-    const scoreLogs = await ScoreLog.findAll({
-      where: { session_id: session.session_id },
+    // 세션의 참가자 정보 조회
+    const participants = await SessionParticipant.findAll({
+      where: { session_id: session.id },
       include: [
         {
           model: Student,
           as: 'student',
-          attributes: ['name']
+          attributes: ['id', 'name']
+        }
+      ]
+    });
+
+    // 가져온 참가자 IDs로 로그 쿼리
+    const participantIds = participants.map(p => p.id);
+    
+    // 세션의 점수 로그 조회 (최신 100개)
+    const scoreLogs = await ScoreLog.findAll({
+      where: { 
+        participantId: participantIds 
+      },
+      include: [
+        {
+          model: SessionParticipant,
+          as: 'participant',
+          include: [
+            {
+              model: Student,
+              as: 'student',
+              attributes: ['id', 'name']
+            }
+          ]
         }
       ],
       order: [['timestamp', 'DESC']],
       limit: 100
     });
-    
+
+    console.log(`참가자 수: ${participants.length}, 점수 로그 수: ${scoreLogs.length}`);
+
     // 응답 형식 변환
     const formattedLogs = scoreLogs.map(log => ({
       timestamp: log.timestamp,
-      studentName: log.student.name,
-      points: log.points
+      studentName: log.participant.student.name,
+      points: log.change
+    }));
+    
+    // 참가자 정보 변환 - 총점 제외
+    const formattedParticipants = participants.map(p => ({
+      id: p.id,
+      studentId: p.student_id,
+      studentName: p.student.name
+      // score 필드 제거: 학생 참여율 향상을 위해
     }));
     
     res.status(200).json({
       session: {
-        id: session.session_id,
+        id: session.id,
+        title: session.name,
         status: session.status,
         startTime: session.start_time
       },
+      participants: formattedParticipants,
       scoreLogs: formattedLogs
     });
   } catch (error) {
     console.error('점수 피드 조회 오류:', error);
+    console.error('상세 오류 정보:', {
+      message: error.message,
+      stack: error.stack,
+      urlId: urlIdentifier
+    });
     res.status(500).json({ message: '점수 피드를 조회하는 중 오류가 발생했습니다.' });
   }
 };
@@ -67,7 +118,7 @@ exports.getSessionWidget = async (req, res) => {
     // URL 식별자로 세션 찾기
     const session = await ClassSession.findOne({
       where: {
-        widget_url: `/widget/${urlIdentifier}`
+        url_identifier: urlIdentifier
       }
     });
     
@@ -75,14 +126,35 @@ exports.getSessionWidget = async (req, res) => {
       return res.status(404).json({ message: '세션을 찾을 수 없습니다.' });
     }
     
-    // 세션의 점수 로그 조회 (최신 5개)
-    const scoreLogs = await ScoreLog.findAll({
-      where: { session_id: session.session_id },
+    // 세션의 참가자 정보 조회
+    const participants = await SessionParticipant.findAll({
+      where: { session_id: session.id },
       include: [
         {
           model: Student,
           as: 'student',
           attributes: ['name']
+        }
+      ]
+    });
+
+    // 가져온 참가자 IDs로 로그 쿼리
+    const participantIds = participants.map(p => p.id);
+    
+    // 세션의 점수 로그 조회 (최신 5개)
+    const scoreLogs = await ScoreLog.findAll({
+      where: { participantId: participantIds },
+      include: [
+        {
+          model: SessionParticipant,
+          as: 'participant',
+          include: [
+            {
+              model: Student,
+              as: 'student',
+              attributes: ['name']
+            }
+          ]
         }
       ],
       order: [['timestamp', 'DESC']],
@@ -92,13 +164,13 @@ exports.getSessionWidget = async (req, res) => {
     // 응답 형식 변환
     const formattedLogs = scoreLogs.map(log => ({
       timestamp: log.timestamp,
-      studentName: log.student.name,
-      points: log.points
+      studentName: log.participant.student.name,
+      points: log.change
     }));
     
     res.status(200).json({
       session: {
-        id: session.session_id,
+        id: session.id,
         status: session.status
       },
       scoreLogs: formattedLogs
@@ -171,72 +243,54 @@ exports.getRankings = async (req, res) => {
         endDate = now;
     }
     
-    // 학생 필터링 조건
+    // 학생 필터링 조건 설정
     let studentFilter = {};
     if (groupId) {
       studentFilter.group_id = groupId;
     }
     
-    // 랭킹 쿼리
-    const rankings = await ScoreLog.findAll({
-      attributes: [
-        'student_id',
-        [sequelize.fn('SUM', sequelize.col('points')), 'totalPoints']
-      ],
-      where: {
-        timestamp: {
-          [sequelize.Op.between]: [startDate, endDate]
-        }
+    // 랭킹 정보를 통합 쿼리로 가져오기
+    const rankings = await sequelize.query(`
+      SELECT 
+        s.id as student_id,
+        s.name as student_name,
+        SUM(sl.change) as total_points
+      FROM 
+        students s
+      JOIN 
+        session_participants sp ON s.id = sp.student_id
+      JOIN 
+        score_logs sl ON sp.id = sl.participant_id
+      WHERE 
+        sl.timestamp BETWEEN :startDate AND :endDate
+        ${groupId ? 'AND s.group_id = :groupId' : ''}
+      GROUP BY 
+        s.id, s.name
+      ORDER BY 
+        total_points DESC
+      LIMIT 
+        100
+    `, {
+      replacements: { 
+        startDate,
+        endDate,
+        ...(groupId && { groupId })
       },
-      include: [
-        {
-          model: Student,
-          as: 'student',
-          attributes: ['name'],
-          where: studentFilter
-        }
-      ],
-      group: ['student_id', 'student.name'],
-      order: [[sequelize.literal('totalPoints'), 'DESC']],
-      raw: true
-    });
-    
-    // 동점자 등수 처리
-    let currentRank = 1;
-    let previousPoints = null;
-    let sameRankCount = 0;
-    
-    const processedRankings = rankings.map((item, index) => {
-      const totalPoints = parseInt(item.totalPoints);
-      
-      // 동점자 처리
-      if (previousPoints !== null && previousPoints !== totalPoints) {
-        currentRank += sameRankCount;
-        sameRankCount = 1;
-      } else {
-        sameRankCount++;
-      }
-      
-      previousPoints = totalPoints;
-      
-      return {
-        rank: currentRank,
-        student_id: item.student_id,
-        name: item['student.name'],
-        totalPoints
-      };
+      type: sequelize.QueryTypes.SELECT
     });
     
     res.status(200).json({
-      period,
-      startDate,
-      endDate,
-      groupId: groupId || null,
-      rankings: processedRankings
+      rankings: rankings.map((r, idx) => ({
+        rank: idx + 1,
+        studentId: r.student_id,
+        studentName: r.student_name,
+        totalPoints: parseInt(r.total_points) || 0
+      })),
+      period
     });
   } catch (error) {
-    console.error('랭킹 조회 오류:', error);
-    res.status(500).json({ message: '랭킹을 조회하는 중 오류가 발생했습니다.' });
+    console.error('랭킹 데이터 조회 오류:', error);
+    res.status(500).json({ message: '랭킹 데이터를 조회하는 중 오류가 발생했습니다.' });
   }
 };
 

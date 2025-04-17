@@ -171,3 +171,13 @@ export const getSystemSettings = async () => {
     throw error.response ? error.response.data : new Error('서버 연결 오류');
   }
 };
+
+// Update a student's score in a session
+export const updateStudentScore = async (sessionId, studentId, points) => {
+  try {
+    const response = await api.put(`/admin/sessions/${sessionId}/participants/${studentId}/score`, { points });
+    return response.data;
+  } catch (error) {
+    throw error.response ? error.response.data : new Error('서버 연결 오류');
+  }
+};

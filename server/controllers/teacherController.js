@@ -435,6 +435,8 @@ exports.updateScore = async (req, res) => {
       return res.status(400).json({ message: '활성 상태인 수업 세션이 아닙니다.' });
     }
 
+    console.log('Got session with identifier:', session.url_identifier);
+    
     // 2. 해당 세션에 참여 중인 학생(SessionParticipant) 찾기
     // sessionParticipant.js 모델 FK 이름 'sessionId', 'studentId' 확인
     const participant = await db.SessionParticipant.findOne({
@@ -470,28 +472,44 @@ exports.updateScore = async (req, res) => {
     console.log(`ScoreLog created (ID: ${scoreLog.id}) for participant ${participant.id}. New score: ${newScore}`);
 
     // 5. WebSocket으로 점수 업데이트 알림
-    const io = req.app.get('io');
-    if (io && session.urlIdentifier) {
-        const studentName = participant.student ? participant.student.name : 'Unknown'; // 학생 이름
+    try {
+      const io = req.app.get('io');
+      console.log('Socket.io instance available:', !!io);
+      
+      if (io) {
+        const studentName = participant.student ? participant.student.name : 'Unknown';
         const payload = {
-            sessionId: sessionId,
-            participantId: participant.id, // SessionParticipant ID
-            studentId: studentId,         // Student ID
-            studentName: studentName,     // 학생 이름
-            change: parsedPoints,         // 점수 변화량
-            newScore: newScore,           // 최종 점수
-            logId: scoreLog.id,
-            timestamp: scoreLog.timestamp
+          sessionId: sessionId,
+          participantId: participant.id,
+          studentId: studentId,
+          studentName: studentName,
+          points: parsedPoints,
+          change: parsedPoints,
+          newScore: newScore,
+          logId: scoreLog.id,
+          timestamp: scoreLog.timestamp
         };
+        
+        // Create room names
         const sessionRoom = `session-${sessionId}`;
-        const feedRoom = `feed-${session.urlIdentifier}`;
-
-        io.to(sessionRoom).emit('scoreUpdate', payload); // 세션 내부용 이벤트 이름 확인
-        io.to(feedRoom).emit('scoreUpdate', payload);    // 공개 피드/위젯용 이벤트 이름 확인
-
-        console.log(`Emitted scoreUpdate to rooms ${sessionRoom}, ${feedRoom}`);
-    } else {
-        console.warn('Socket.io instance not found or session urlIdentifier missing, cannot emit scoreUpdate event.');
+        const feedRoom = `feed-${session.url_identifier}`;
+        
+        console.log(`Emitting to socket rooms: ${sessionRoom}, ${feedRoom}`);
+        
+        // Direct emit to each room
+        io.to(sessionRoom).emit('scoreUpdate', payload);
+        io.to(feedRoom).emit('scoreUpdate', payload);
+        
+        // Also broadcast to all clients
+        io.emit('scoreUpdate', payload);
+        
+        console.log('Socket.io message emitted successfully');
+      } else {
+        console.warn('Socket.io instance not available, skipping real-time update');
+      }
+    } catch (socketError) {
+      console.error('Error emitting socket event:', socketError);
+      // Don't fail the request if socket emission fails
     }
 
     res.status(200).json({
@@ -635,8 +653,22 @@ exports.getStudentRankings = async (req, res) => {
       type: db.sequelize.QueryTypes.SELECT
     });
     
+    // Debug: Check the structure of the results
     console.log(`teacherController: Found ${studentRankings.length} students for ranking`);
-    res.status(200).json(studentRankings);
+    console.log('Student rankings sample:', studentRankings.slice(0, 3));
+    
+    // Ensure the totalScore is properly converted to a number and handle field name casing issues
+    const formattedRankings = studentRankings.map(student => {
+      // The SQL result returns 'totalscore' (lowercase) but our client expects 'totalScore'
+      const score = parseInt(student.totalscore || student.totalScore || 0, 10);
+      return {
+        id: student.id,
+        name: student.name,
+        totalScore: score
+      };
+    });
+    
+    res.status(200).json(formattedRankings);
   } catch (error) {
     console.error('Error fetching student rankings:', error.stack || error);
     res.status(500).json({ message: '학생 랭킹 조회 중 오류가 발생했습니다.' });

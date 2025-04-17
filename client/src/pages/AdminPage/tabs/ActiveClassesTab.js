@@ -68,10 +68,44 @@ const Participant = styled.div`
   font-size: 14px;
   display: flex;
   justify-content: space-between;
+  align-items: center;
   
   &:last-child {
     border-bottom: none;
   }
+`;
+
+const ScoreControls = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 5px;
+`;
+
+const ScoreButton = styled.button`
+  background-color: ${props => props.$type === 'minus' ? '#ffebee' : '#e8f5e9'};
+  color: ${props => props.$type === 'minus' ? '#d32f2f' : '#388e3c'};
+  border: 1px solid ${props => props.$type === 'minus' ? '#ffcdd2' : '#c8e6c9'};
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 12px;
+  cursor: pointer;
+  
+  &:hover {
+    background-color: ${props => props.$type === 'minus' ? '#ffcdd2' : '#c8e6c9'};
+  }
+`;
+
+const ScoreInput = styled.input`
+  width: 40px;
+  text-align: center;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 2px 4px;
 `;
 
 const Score = styled.span`
@@ -124,6 +158,8 @@ function ActiveClassesTab() {
   const [activeSessions, setActiveSessions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [scoreInputs, setScoreInputs] = useState({});
+  const [editingScore, setEditingScore] = useState(null);
   
   const fetchActiveSessions = async () => {
     setIsLoading(true);
@@ -164,6 +200,72 @@ function ActiveClassesTab() {
     } catch (err) {
       setError('수업 종료 중 오류가 발생했습니다.');
       console.error('Error ending session:', err);
+    }
+  };
+  
+  const startEditScore = (sessionId, participantId, currentScore) => {
+    setEditingScore(`${sessionId}-${participantId}`);
+    setScoreInputs({
+      ...scoreInputs,
+      [`${sessionId}-${participantId}`]: 0 // Initialize with zero for relative score change
+    });
+  };
+  
+  const cancelEditScore = () => {
+    setEditingScore(null);
+  };
+  
+  const handleScoreInputChange = (sessionId, participantId, value) => {
+    const numValue = parseInt(value, 10) || 0;
+    setScoreInputs({
+      ...scoreInputs,
+      [`${sessionId}-${participantId}`]: numValue
+    });
+  };
+  
+  const handleQuickScoreChange = (sessionId, participantId, value) => {
+    const currentValue = scoreInputs[`${sessionId}-${participantId}`] || 0;
+    setScoreInputs({
+      ...scoreInputs,
+      [`${sessionId}-${participantId}`]: currentValue + value
+    });
+  };
+  
+  const saveScoreChange = async (sessionId, studentId, participantId) => {
+    try {
+      const points = scoreInputs[`${sessionId}-${participantId}`];
+      if (points === 0) {
+        setEditingScore(null);
+        return;
+      }
+      
+      await adminService.updateStudentScore(sessionId, studentId, points);
+      
+      // Update local state
+      setActiveSessions(prevSessions => 
+        prevSessions.map(session => {
+          if (session.id === parseInt(sessionId)) {
+            return {
+              ...session,
+              sessionParticipants: session.sessionParticipants.map(participant => {
+                if (participant.id === parseInt(participantId)) {
+                  return {
+                    ...participant,
+                    score: participant.score + points
+                  };
+                }
+                return participant;
+              })
+            };
+          }
+          return session;
+        })
+      );
+      
+      setEditingScore(null);
+    } catch (err) {
+      console.error('Error updating score:', err);
+      alert('점수 변경 중 오류가 발생했습니다.');
     }
   };
   
@@ -209,9 +311,50 @@ function ActiveClassesTab() {
                   session.sessionParticipants.map(participant => (
                     <Participant key={participant.id}>
                       <span>{participant.student?.name || '알 수 없음'}</span>
-                      <Score $value={participant.score}>
-                        {participant.score > 0 ? '+' : ''}{participant.score}
-                      </Score>
+                      
+                      {editingScore === `${session.id}-${participant.id}` ? (
+                        <ScoreControls>
+                          <ScoreButton 
+                            $type="minus" 
+                            onClick={() => handleQuickScoreChange(session.id, participant.id, -1)}
+                          >-1</ScoreButton>
+                          <ScoreButton 
+                            $type="minus" 
+                            onClick={() => handleQuickScoreChange(session.id, participant.id, -5)}
+                          >-5</ScoreButton>
+                          
+                          <ScoreInput 
+                            type="number" 
+                            value={scoreInputs[`${session.id}-${participant.id}`]} 
+                            onChange={(e) => handleScoreInputChange(session.id, participant.id, e.target.value)}
+                          />
+                          
+                          <ScoreButton 
+                            $type="plus" 
+                            onClick={() => handleQuickScoreChange(session.id, participant.id, 5)}
+                          >+5</ScoreButton>
+                          <ScoreButton 
+                            $type="plus" 
+                            onClick={() => handleQuickScoreChange(session.id, participant.id, 1)}
+                          >+1</ScoreButton>
+                          
+                          <ScoreButton onClick={() => saveScoreChange(session.id, participant.studentId, participant.id)}>
+                            ✓
+                          </ScoreButton>
+                          <ScoreButton onClick={cancelEditScore}>
+                            ✕
+                          </ScoreButton>
+                        </ScoreControls>
+                      ) : (
+                        <ScoreControls>
+                          <Score $value={participant.score}>
+                            {participant.score > 0 ? '+' : ''}{participant.score}
+                          </Score>
+                          <ScoreButton onClick={() => startEditScore(session.id, participant.id, participant.score)}>
+                            ✏️
+                          </ScoreButton>
+                        </ScoreControls>
+                      )}
                     </Participant>
                   ))
                 ) : (

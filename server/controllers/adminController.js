@@ -679,3 +679,91 @@ exports.getSystemSettings = async (req, res) => {
     res.status(500).json({ message: '시스템 설정을 조회하는 중 오류가 발생했습니다.' });
   }
 };
+
+// 학생 점수 업데이트 (관리자 기능)
+exports.updateStudentScore = async (req, res) => {
+  const { sessionId, studentId } = req.params;
+  const { points } = req.body;
+  const adminIdentifier = req.ip || 'admin';
+
+  console.log(`adminController: updateStudentScore triggered for session ${sessionId}, student ${studentId}, points ${points} by ${adminIdentifier}`);
+
+  if (!points) {
+    return res.status(400).json({ message: '점수는 필수 항목입니다.' });
+  }
+
+  const t = await sequelize.transaction();
+
+  try {
+    // 세션 참가자 조회
+    const participant = await SessionParticipant.findOne({
+      where: {
+        classSessionId: sessionId,
+        studentId: studentId
+      },
+      include: [{
+        model: Student,
+        as: 'student'
+      }],
+      transaction: t
+    });
+
+    if (!participant) {
+      await t.rollback();
+      return res.status(404).json({ message: '세션 참가자를 찾을 수 없습니다.' });
+    }
+
+    // 세션 조회
+    const session = await ClassSession.findByPk(sessionId, { transaction: t });
+    if (!session) {
+      await t.rollback();
+      return res.status(404).json({ message: '세션을 찾을 수 없습니다.' });
+    }
+
+    // 점수 로그 생성
+    const scoreLog = await ScoreLog.create({
+      participantId: participant.id,
+      change: parseInt(points),
+      timestamp: new Date()
+    }, { transaction: t });
+
+    // 참가자 점수 업데이트
+    const newScore = participant.score + parseInt(points);
+    await participant.update({ score: newScore }, { transaction: t });
+
+    await t.commit();
+
+    // Socket.io를 통한 실시간 업데이트 (server.js에서 정의된 io 인스턴스 사용)
+    const io = req.app.get('io');
+    if (io && session.urlIdentifier) {
+      const studentName = participant.student ? participant.student.name : 'Unknown';
+      const payload = {
+        sessionId: sessionId,
+        participantId: participant.id,
+        studentId: studentId,
+        studentName: studentName,
+        change: parseInt(points),
+        newScore: newScore,
+        logId: scoreLog.id,
+        timestamp: scoreLog.timestamp
+      };
+      const sessionRoom = `session-${sessionId}`;
+      const feedRoom = `feed-${session.urlIdentifier}`;
+
+      io.to(sessionRoom).emit('scoreUpdate', payload);
+      io.to(feedRoom).emit('scoreUpdate', payload);
+    }
+
+    res.status(200).json({
+      message: '점수가 업데이트되었습니다.',
+      participantId: participant.id,
+      studentId: studentId,
+      newScore: newScore,
+      logId: scoreLog.id
+    });
+  } catch (error) {
+    await t.rollback();
+    console.error('Error updating score:', error.stack || error);
+    res.status(500).json({ message: '점수 업데이트 중 오류가 발생했습니다.' });
+  }
+};

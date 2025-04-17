@@ -14,6 +14,7 @@ function RankingPage() {
       try {
         setLoading(true);
         const data = await teacherService.getStudentRankings(periodFilter);
+        console.log('Rankings data received:', data);
         setRankings(data);
       } catch (err) {
         console.error('Error fetching rankings:', err);
@@ -70,16 +71,19 @@ function RankingPage() {
               </tr>
             </thead>
             <tbody>
-              {rankings.map((student, index) => (
-                <tr key={student.id} className={index < 3 ? `top-${index + 1}` : ''}>
-                  <td className="rank-column">
-                    {index + 1}
-                    {index < 3 && <span className="rank-badge">🏆</span>}
-                  </td>
-                  <td className="name-column">{student.name}</td>
-                  <td className="score-column">{student.totalScore}</td>
-                </tr>
-              ))}
+              {rankings.map((student, index) => {
+                console.log(`Student ${index}: ${student.name}, Score: ${student.totalScore}`);
+                return (
+                  <tr key={student.id} className={index < 3 ? `top-${index + 1}` : ''}>
+                    <td className="rank-column">
+                      {index + 1}
+                      {index < 3 && <span className="rank-badge">🏆</span>}
+                    </td>
+                    <td className="name-column">{student.name}</td>
+                    <td className="score-column">{student.totalScore}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

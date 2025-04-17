@@ -9,6 +9,10 @@ const { verifyTeacherToken } = require('../middlewares/auth'); // <<< 수정: ve
 // teacherController 객체 전체를 가져옵니다.
 const teacherController = require('../controllers/teacherController');
 
+// --- 공개 라우트 (인증 필요 없음) ---
+// 랭킹 조회는 인증 없이 접근 가능하도록 함
+router.get('/rankings', teacherController.getStudentRankings);
+
 // --- 로그인 라우트 ---
 // 로그인은 인증 미들웨어 적용 전에 처리해야 합니다.
 router.post('/login', teacherController.login);
@@ -35,9 +39,6 @@ router.post('/score', teacherController.updateScore);
 
 // --- 히스토리 관련 라우트 ---
 router.get('/my-sessions', teacherController.getMySessionHistory);
-
-// --- 랭킹 관련 라우트 ---
-router.get('/rankings', teacherController.getStudentRankings);
 
 // 라우터 모듈을 export 합니다.
 module.exports = router;

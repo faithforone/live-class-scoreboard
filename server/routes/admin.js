@@ -54,6 +54,7 @@ router.post('/ranking-period', adminController.updateRankingPeriod);
 // 활성 세션 관리
 router.get('/active-sessions', adminController.getActiveSessions);
 router.put('/active-sessions/:sessionId/end', adminController.forceEndSession);
+router.put('/sessions/:sessionId/participants/:studentId/score', adminController.updateStudentScore);
 
 // 종료된 수업 세션 조회
 router.get('/completed-sessions', adminController.getCompletedSessions);
