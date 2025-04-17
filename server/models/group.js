@@ -7,7 +7,7 @@ module.exports = (sequelize, DataTypes) => {
     static associate(models) {
       // 그룹은 여러 학생을 가질 수 있음 (N:M)
       Group.belongsToMany(models.Student, {
-        through: 'student_groups', // 중간 테이블 이름 (snake_case로 변경)
+        through: models.StudentGroup, // 문자열 대신 모델 객체 사용
         foreignKey: 'group_id',     // 중간 테이블의 그룹 ID 외래 키
         otherKey: 'student_id',   // 중간 테이블의 학생 ID 외래 키
         as: 'students'           // 관계 접근 시 사용할 별칭 (컨트롤러 로직과 일치)
@@ -15,7 +15,7 @@ module.exports = (sequelize, DataTypes) => {
 
       // 그룹은 여러 템플릿에 속할 수 있음 (N:M)
       Group.belongsToMany(models.Template, {
-        through: 'template_groups',
+        through: models.TemplateGroup, // 문자열 대신 모델 객체 사용
         foreignKey: 'group_id',
         otherKey: 'template_id',
         as: 'templates'

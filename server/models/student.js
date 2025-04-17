@@ -7,7 +7,7 @@ module.exports = (sequelize, DataTypes) => {
     static associate(models) {
       // 학생은 여러 그룹에 속할 수 있음 (N:M)
       Student.belongsToMany(models.Group, {
-        through: 'student_groups', // 중간 테이블 이름 (snake_case)
+        through: models.StudentGroup, // 문자열 대신 모델 객체 사용
         foreignKey: 'student_id', // 중간 테이블의 학생 ID 외래 키
         otherKey: 'group_id',     // 중간 테이블의 그룹 ID 외래 키
         as: 'groups'             // 관계 접근 시 사용할 별칭
