@@ -125,15 +125,29 @@ function ActiveClassesTab() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   
+  const getAuthConfig = () => {
+    try {
+      const adminAuth = JSON.parse(localStorage.getItem('adminAuth') || '{}');
+      return {
+        headers: {
+          'x-auth-token': adminAuth.token || ''
+        }
+      };
+    } catch (err) {
+      console.error('Error parsing auth token:', err);
+      return { headers: {} };
+    }
+  };
+  
   const fetchActiveSessions = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get('/api/admin/active-sessions');
+      const response = await axios.get('/api/admin/active-sessions', getAuthConfig());
       setActiveSessions(response.data);
       setError(null);
     } catch (err) {
-      setError('현재 수업 목록을 불러오는 중 오류가 발생했습니다.');
       console.error('Error fetching active sessions:', err);
+      setError('현재 수업 목록을 불러오는 중 오류가 발생했습니다.');
     } finally {
       setIsLoading(false);
     }

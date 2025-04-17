@@ -7,7 +7,7 @@ import axios from 'axios';
 import ActiveClassesTab from './tabs/ActiveClassesTab';
 import StudentsTab from './tabs/StudentsTab';
 import GroupsTab from './tabs/GroupsTab';
-import ClassTemplatesTab from './tabs/ClassTemplatesTab';
+import TemplatesTab from './tabs/TemplatesTab';
 import SettingsTab from './tabs/SettingsTab';
 
 const Container = styled.div`
@@ -118,7 +118,7 @@ function AdminDashboard() {
       {activeTab === 'active-classes' && <ActiveClassesTab />}
       {activeTab === 'students' && <StudentsTab />}
       {activeTab === 'groups' && <GroupsTab />}
-      {activeTab === 'templates' && <ClassTemplatesTab />}
+      {activeTab === 'templates' && <TemplatesTab />}
       {activeTab === 'settings' && <SettingsTab />}
     </Container>
   );

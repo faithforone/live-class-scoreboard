@@ -31,6 +31,7 @@ function App() {
       <Router>
         <Routes>
           {/* 관리자 영역 */}
+          <Route path="/admin" element={<Navigate to="/admin/login" replace />} />
           <Route path="/admin/login" element={<AdminLoginPage />} />
           <Route path="/admin/dashboard" element={
             <ProtectedRoute role="admin">

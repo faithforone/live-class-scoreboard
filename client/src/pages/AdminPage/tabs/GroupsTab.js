@@ -204,10 +204,24 @@ function GroupsTab() {
     name: ''
   });
   
+  const getAuthConfig = () => {
+    try {
+      const adminAuth = JSON.parse(localStorage.getItem('adminAuth') || '{}');
+      return {
+        headers: {
+          'x-auth-token': adminAuth.token || ''
+        }
+      };
+    } catch (err) {
+      console.error('Error parsing auth token:', err);
+      return { headers: {} };
+    }
+  };
+  
   const fetchGroups = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get('/api/admin/groups');
+      const response = await axios.get('/api/admin/groups', getAuthConfig());
       // The API now returns groups with their students included
       setGroups(response.data);
       setError(null);

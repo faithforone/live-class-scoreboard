@@ -246,10 +246,25 @@ function StudentsTab() {
     groupIds: []
   });
   
+  // Add this function at the top of the component
+  const getAuthConfig = () => {
+    try {
+      const adminAuth = JSON.parse(localStorage.getItem('adminAuth') || '{}');
+      return {
+        headers: {
+          'x-auth-token': adminAuth.token || ''
+        }
+      };
+    } catch (err) {
+      console.error('Error parsing auth token:', err);
+      return { headers: {} };
+    }
+  };
+  
   const fetchStudents = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get('/api/admin/students');
+      const response = await axios.get('/api/admin/students', getAuthConfig());
       setStudents(response.data);
       setError(null);
     } catch (err) {
@@ -262,7 +277,7 @@ function StudentsTab() {
   
   const fetchGroups = async () => {
     try {
-      const response = await axios.get('/api/admin/groups');
+      const response = await axios.get('/api/admin/groups', getAuthConfig());
       setGroups(response.data);
     } catch (err) {
       console.error('Error fetching groups:', err);

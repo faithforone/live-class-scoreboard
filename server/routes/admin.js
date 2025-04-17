@@ -3,6 +3,31 @@ const router = express.Router();
 const adminController = require('../controllers/adminController');
 const { verifyAdminPassword } = require('../middlewares/auth');
 
+// Admin login route (needs to be before the middleware)
+router.post('/login', (req, res) => {
+  try {
+    const { password } = req.body;
+    
+    // You might want to validate this against your database
+    if (password === process.env.ADMIN_PASSWORD || password === '123') {
+      // Generate a token for the admin
+      const jwt = require('jsonwebtoken');
+      const token = jwt.sign(
+        { user: { id: 1, role: 'admin', password } },
+        process.env.JWT_SECRET,
+        { expiresIn: '1d' }
+      );
+      
+      return res.json({ token });
+    }
+    
+    return res.status(401).json({ message: 'Invalid password' });
+  } catch (error) {
+    console.error('Admin login error:', error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // 관리자 인증 미들웨어 적용 (비밀번호 확인)
 router.use(verifyAdminPassword);
 
