@@ -136,11 +136,11 @@ exports.getRankings = async (req, res) => {
         // 학기/단계별 기간은 DB에서 조회
         try {
           const termSettings = await SystemSetting.findOne({
-            where: { setting_key: 'ranking_period_term' }
+            where: { settingKey: 'ranking_period_term' }
           });
           
           if (termSettings) {
-            const { startDate: termStart, endDate: termEnd } = JSON.parse(termSettings.setting_value);
+            const { startDate: termStart, endDate: termEnd } = JSON.parse(termSettings.settingValue);
             startDate = new Date(termStart);
             endDate = new Date(termEnd);
           } else {

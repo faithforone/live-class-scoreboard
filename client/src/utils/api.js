@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // 토큰을 저장하는 로컬 스토리지 키 (AuthContext.js 와 동일하게 유지)
 const TEACHER_TOKEN_KEY = 'teacherToken';
-// const ADMIN_TOKEN_KEY = 'adminToken'; // 관리자 토큰 키 (필요 시)
+const ADMIN_TOKEN_KEY = 'adminAuth'; // 관리자 토큰 키 추가
 
 // 기본 API 클라이언트 설정
 const api = axios.create({
@@ -18,16 +18,35 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     // 로컬 스토리지에서 토큰 가져오기
-    const token = localStorage.getItem(TEACHER_TOKEN_KEY);
-    // const adminToken = localStorage.getItem(ADMIN_TOKEN_KEY); // 관리자 토큰도 필요 시
-    // const currentToken = token || adminToken; // 어떤 토큰을 사용할지 로직 필요 (여기서는 교사 토큰만 가정)
+    const teacherToken = localStorage.getItem(TEACHER_TOKEN_KEY);
+    const adminAuthItem = localStorage.getItem(ADMIN_TOKEN_KEY);
+    
+    // 관리자 토큰 추출 (adminAuth는 JSON 형태로 저장됨)
+    let adminToken = null;
+    try {
+      if (adminAuthItem) {
+        const adminAuth = JSON.parse(adminAuthItem);
+        adminToken = adminAuth.token;
+      }
+    } catch (e) {
+      console.error('Failed to parse admin token:', e);
+    }
+    
+    // 어떤 토큰을 사용할지 결정 (관리자 토큰 우선)
+    const token = adminToken || teacherToken;
 
     if (token) {
       // 토큰이 있으면 Authorization 헤더 추가
       config.headers['Authorization'] = `Bearer ${token}`;
-      // console.log('Interceptor: Token added to headers'); // 디버깅 로그
+      
+      // 관리자 토큰의 경우 x-auth-token 헤더도 추가 (기존 코드와의 호환성)
+      if (adminToken) {
+        config.headers['x-auth-token'] = token;
+      }
+      
+      console.log('Interceptor: Token added to headers:', config.headers);
     } else {
-      // console.log('Interceptor: No token found'); // 디버깅 로그
+      console.log('Interceptor: No token found');
     }
     return config; // 수정된 설정 또는 원본 설정 반환
   },
@@ -53,7 +72,7 @@ api.interceptors.response.use(
       console.log('Interceptor: Received 401 Unauthorized. Logging out.');
       // 토큰 제거
       localStorage.removeItem(TEACHER_TOKEN_KEY);
-      // localStorage.removeItem(ADMIN_TOKEN_KEY); // 관리자 토큰도 제거
+      localStorage.removeItem(ADMIN_TOKEN_KEY); // 관리자 토큰도 제거
 
       // 로그인 페이지로 리디렉션 (AuthContext 상태 변경도 필요할 수 있으나 여기서 직접 호출은 어려움)
       // window.location.href = '/teacher/login'; // 강제 페이지 이동 방식

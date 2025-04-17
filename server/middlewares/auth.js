@@ -73,10 +73,10 @@ exports.verifyTeacherPassword = async (req, res, next) => {
     }
 
     const teacherPassword = await SystemSetting.findOne({
-      where: { setting_key: 'teacher_password' }
+      where: { settingKey: 'teacher_password' }
     });
 
-    if (!teacherPassword || teacherPassword.setting_value !== password) {
+    if (!teacherPassword || teacherPassword.settingValue !== password) {
       return res.status(401).json({ message: '잘못된 비밀번호입니다.' });
     }
 
@@ -99,10 +99,10 @@ exports.verifyAdminPassword = async (req, res, next) => {
 
     // DB 또는 환경 변수에서 관리자 비밀번호 조회
     const adminPasswordSetting = await SystemSetting.findOne({
-      where: { setting_key: 'admin_password' }
+      where: { settingKey: 'admin_password' }
     });
     // DB에 없으면 환경 변수 확인 (선택적)
-    const correctPassword = adminPasswordSetting ? adminPasswordSetting.setting_value : process.env.ADMIN_PASSWORD;
+    const correctPassword = adminPasswordSetting ? adminPasswordSetting.settingValue : process.env.ADMIN_PASSWORD;
 
     if (!correctPassword) {
         console.error("Admin password not found in SystemSetting or .env.");

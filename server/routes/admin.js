@@ -34,18 +34,16 @@ router.use(auth);
 // 학생 관리
 router.get('/students', adminController.getAllStudents);
 router.post('/students', adminController.createStudent);
-router.put('/students/:student_id', adminController.updateStudent);
-router.delete('/students/:student_id', adminController.deleteStudent);
+router.put('/students/:studentId', adminController.updateStudent);
+router.delete('/students/:studentId', adminController.deleteStudent);
 
 // 그룹 관리
 router.get('/groups', adminController.getAllGroups);
 router.post('/groups', adminController.createGroup);
-router.put('/groups/:group_id', adminController.updateGroup);
-router.delete('/groups/:group_id', adminController.deleteGroup);
-
-// 그룹-학생 연결 관리
-router.post('/groups/:group_id/students', adminController.addStudentToGroup);
-router.delete('/groups/:group_id/students/:student_id', adminController.removeStudentFromGroup);
+router.put('/groups/:groupId', adminController.updateGroup);
+router.delete('/groups/:groupId', adminController.deleteGroup);
+router.post('/groups/:groupId/students', adminController.addStudentsToGroup);
+router.delete('/groups/:groupId/students/:studentId', adminController.removeStudentFromGroup);
 
 // 비밀번호 관리
 router.post('/password', adminController.updatePassword);
@@ -53,18 +51,18 @@ router.post('/password', adminController.updatePassword);
 // 랭킹 기간 설정
 router.post('/ranking-period', adminController.updateRankingPeriod);
 
-// 활성 수업 세션 관리
+// 활성 세션 관리
 router.get('/active-sessions', adminController.getActiveSessions);
-router.put('/active-sessions/:session_id/end', adminController.forceEndSession);
+router.put('/active-sessions/:sessionId/end', adminController.forceEndSession);
 
 // 종료된 수업 세션 조회
 router.get('/completed-sessions', adminController.getCompletedSessions);
-router.get('/sessions/:session_id/logs', adminController.getSessionScoreLogs);
+router.get('/sessions/:sessionId/logs', adminController.getSessionScoreLogs);
 
 // 점수 초기화
 router.post('/reset-scores', adminController.resetScores);
 
-// 시스템 설정 조회
+// 시스템 설정
 router.get('/settings', adminController.getSystemSettings);
 
 module.exports = router;

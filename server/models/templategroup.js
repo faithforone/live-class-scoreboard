@@ -43,7 +43,8 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     sequelize,
     modelName: 'TemplateGroup',
-    tableName: 'template_groups'
+    tableName: 'template_groups',
+    underscored: false
   });
   
   return TemplateGroup;

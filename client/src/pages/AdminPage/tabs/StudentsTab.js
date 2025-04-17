@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import axios from 'axios';
-import api from '../../../utils/api';
+import * as adminService from '../../../services/adminService';
 
 const Container = styled.div`
   background-color: white;
@@ -250,11 +249,8 @@ function StudentsTab() {
   const fetchStudents = async () => {
     setIsLoading(true);
     try {
-      const adminAuth = JSON.parse(localStorage.getItem('adminAuth') || '{}');
-      const response = await axios.get('/api/admin/students', {
-        headers: { 'x-auth-token': adminAuth.token || '' }
-      });
-      setStudents(response.data);
+      const data = await adminService.getAllStudents();
+      setStudents(data);
       setError(null);
     } catch (err) {
       setError('학생 목록을 불러오는 중 오류가 발생했습니다.');
@@ -266,11 +262,8 @@ function StudentsTab() {
   
   const fetchGroups = async () => {
     try {
-      const adminAuth = JSON.parse(localStorage.getItem('adminAuth') || '{}');
-      const response = await axios.get('/api/admin/groups', {
-        headers: { 'x-auth-token': adminAuth.token || '' }
-      });
-      setGroups(response.data);
+      const data = await adminService.getAllGroups();
+      setGroups(data);
     } catch (err) {
       console.error('Error fetching groups:', err);
     }
@@ -310,7 +303,7 @@ function StudentsTab() {
     }
     
     try {
-      await axios.delete(`/api/admin/students/${studentId}`);
+      await adminService.deleteStudent(studentId);
       
       // Update local state
       setStudents(students.filter(student => student.id !== studentId));
@@ -344,24 +337,16 @@ function StudentsTab() {
     e.preventDefault();
     
     try {
-      const adminAuth = JSON.parse(localStorage.getItem('adminAuth') || '{}');
-      const config = {
-        headers: { 'x-auth-token': adminAuth.token || '' }
-      };
-      
       if (modalMode === 'add') {
         // Add mode
-        await axios.post('/api/admin/students', formData, config);
-        
-        // Refresh the students list
-        fetchStudents();
+        await adminService.createStudent(formData);
       } else {
         // Edit mode
-        await axios.put(`/api/admin/students/${currentStudent.id}`, formData, config);
-        
-        // Refresh to get updated data with groups
-        fetchStudents();
+        await adminService.updateStudent(currentStudent.id, formData);
       }
+      
+      // Refresh the students list
+      fetchStudents();
       
       // Close the modal after submission
       setShowModal(false);

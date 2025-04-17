@@ -6,8 +6,8 @@ module.exports = (sequelize, DataTypes) => {
       // Define association with Group model
       Template.belongsToMany(models.Group, {
         through: models.TemplateGroup,
-        foreignKey: 'template_id',
-        otherKey: 'group_id',
+        foreignKey: 'templateId',
+        otherKey: 'groupId',
         as: 'groups'
       });
     }
@@ -33,7 +33,7 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: []
       },
-      is_active: {
+      isActive: {
         type: DataTypes.BOOLEAN,
         allowNull: false,
         defaultValue: true

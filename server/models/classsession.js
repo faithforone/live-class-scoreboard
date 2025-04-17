@@ -24,13 +24,13 @@ module.exports = (sequelize, DataTypes) => {
       });
       // 세션은 템플릿과 연결될 수 있음 (N:1 관계, optional)
       ClassSession.belongsTo(models.Template, {
-        foreignKey: 'template_id',  // ClassSession 테이블의 외래 키
+        foreignKey: 'templateId',  // ClassSession 테이블의 외래 키 (camelCase로 변경)
         as: 'template',            // 관계 접근 시 사용할
         allowNull: true           // 템플릿은 선택적
       });
       // 세션은 그룹과 연결될 수 있음 (N:1 관계, optional)
       ClassSession.belongsTo(models.Group, {
-        foreignKey: 'group_id',    // ClassSession 테이블의 외래 키
+        foreignKey: 'groupId',    // ClassSession 테이블의 외래 키 (camelCase로 변경)
         as: 'group',               // 관계 접근 시 사용할
         allowNull: true           // 그룹은 선택적
       });
@@ -52,21 +52,21 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       defaultValue: 'active'
     },
-    start_time: {
+    startTime: { // snake_case에서 camelCase로 변경
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW // 생성 시 현재 시간 기본값
     },
-    end_time: {
+    endTime: { // snake_case에서 camelCase로 변경
       type: DataTypes.DATE,
       allowNull: true // 종료 시 설정
     },
-    url_identifier: { // 뷰어 페이지 접근용 고유 ID
+    urlIdentifier: { // snake_case에서 camelCase로 변경
       type: DataTypes.STRING, // UUID 등을 사용하므로 STRING
       allowNull: false,
       unique: true
     },
-    template_id: { // Template 연결용 FK
+    templateId: { // snake_case에서 camelCase로 변경
       type: DataTypes.INTEGER,
       allowNull: true, // 선택적 관계
       references: {
@@ -74,7 +74,7 @@ module.exports = (sequelize, DataTypes) => {
         key: 'id'          // 참조 컬럼
       }
     },
-    group_id: { // Group 연결용 FK
+    groupId: { // snake_case에서 camelCase로 변경
       type: DataTypes.INTEGER,
       allowNull: true, // 선택적 관계
       references: {

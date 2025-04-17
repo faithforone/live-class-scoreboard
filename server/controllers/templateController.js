@@ -9,7 +9,12 @@ const { Template, Group } = require('../models');
 const getAllTemplates = async (req, res) => {
   try {
     const templates = await Template.findAll({
-      include: [{ model: Group, as: 'groups', attributes: ['id', 'name'] }]
+      attributes: ['id', 'name', 'description', 'metrics', ['is_active', 'isActive'], ['created_at', 'createdAt'], ['updated_at', 'updatedAt']],
+      include: [{ 
+        model: Group, 
+        as: 'groups', 
+        attributes: ['id', 'name'] 
+      }]
     });
     
     return res.json(templates);
@@ -27,7 +32,12 @@ const getAllTemplates = async (req, res) => {
 const getTemplateById = async (req, res) => {
   try {
     const template = await Template.findByPk(req.params.id, {
-      include: [{ model: Group, as: 'groups', attributes: ['id', 'name'] }]
+      attributes: ['id', 'name', 'description', 'metrics', ['is_active', 'isActive'], ['created_at', 'createdAt'], ['updated_at', 'updatedAt']],
+      include: [{ 
+        model: Group, 
+        as: 'groups', 
+        attributes: ['id', 'name'] 
+      }]
     });
     
     if (!template) {
@@ -134,7 +144,12 @@ const deleteTemplate = async (req, res) => {
 const getTemplateGroups = async (req, res) => {
   try {
     const template = await Template.findByPk(req.params.id, {
-      include: [{ model: Group, as: 'groups', attributes: ['id', 'name'] }]
+      attributes: ['id', 'name', 'description', 'metrics', ['is_active', 'isActive'], ['created_at', 'createdAt'], ['updated_at', 'updatedAt']],
+      include: [{ 
+        model: Group, 
+        as: 'groups', 
+        attributes: ['id', 'name'] 
+      }]
     });
     
     if (!template) {
@@ -175,7 +190,12 @@ const addGroupToTemplate = async (req, res) => {
     
     // Get the updated template with all groups
     const updatedTemplate = await Template.findByPk(req.params.id, {
-      include: [{ model: Group, as: 'groups', attributes: ['id', 'name'] }]
+      attributes: ['id', 'name', 'description', 'metrics', ['is_active', 'isActive'], ['created_at', 'createdAt'], ['updated_at', 'updatedAt']],
+      include: [{ 
+        model: Group, 
+        as: 'groups', 
+        attributes: ['id', 'name'] 
+      }]
     });
     
     return res.json(updatedTemplate);

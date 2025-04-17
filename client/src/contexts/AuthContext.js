@@ -10,12 +10,12 @@ export const useAuth = () => useContext(AuthContext);
 
 // 토큰을 저장할 로컬 스토리지 키 이름 정의
 const TEACHER_TOKEN_KEY = 'teacherToken';
-const ADMIN_TOKEN_KEY = 'adminToken'; // 관리자용 토큰 키 (필요 시)
+const ADMIN_TOKEN_KEY = 'adminAuth';
 
 export const AuthProvider = ({ children }) => {
   // 초기 상태는 로컬 스토리지의 토큰 존재 여부로 결정
   const [teacherAuth, setTeacherAuth] = useState(!!localStorage.getItem(TEACHER_TOKEN_KEY));
-  const [adminAuth, setAdminAuth] = useState(!!localStorage.getItem('adminAuth'));
+  const [adminAuth, setAdminAuth] = useState(!!localStorage.getItem(ADMIN_TOKEN_KEY));
   // 로딩 상태는 초기에 잠시 true였다가 토큰 확인 후 false로 변경
   const [loading, setLoading] = useState(true);
 
@@ -23,7 +23,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     // console.log('AuthProvider Mounted: Initial check for tokens.');
     setTeacherAuth(!!localStorage.getItem(TEACHER_TOKEN_KEY));
-    setAdminAuth(!!localStorage.getItem('adminAuth'));
+    setAdminAuth(!!localStorage.getItem(ADMIN_TOKEN_KEY));
     setLoading(false); // 토큰 확인 후 로딩 완료
   }, []);
 
@@ -78,20 +78,21 @@ export const AuthProvider = ({ children }) => {
     // (필요 시) 백엔드 로그아웃 API 호출
   }, []);
 
-  // --- 관리자 로그인/로그아웃 (JWT 방식으로 수정 필요 시 유사하게 변경) ---
+  // --- 관리자 로그인/로그아웃 (JWT 방식으로 수정) ---
   const adminLogin = async (password) => {
     try {
       // 관리자 로그인 API 호출 및 토큰 처리
       const responseData = await adminService.adminLogin(password);
       if (responseData && responseData.token) {
-        localStorage.setItem('adminAuth', responseData.token);
+        // 토큰을 JSON 객체로 저장 (기존 코드와의 호환성)
+        localStorage.setItem(ADMIN_TOKEN_KEY, JSON.stringify({ token: responseData.token }));
         setAdminAuth(true);
         return true;
       } else {
         throw new Error('관리자 로그인 응답 형식이 올바르지 않습니다.');
       }
     } catch (error) {
-      localStorage.removeItem('adminAuth');
+      localStorage.removeItem(ADMIN_TOKEN_KEY);
       setAdminAuth(false);
       throw error;
     }
@@ -99,7 +100,7 @@ export const AuthProvider = ({ children }) => {
 
   const adminLogout = useCallback(() => {
     // 관리자 토큰 제거
-    localStorage.removeItem('adminAuth');
+    localStorage.removeItem(ADMIN_TOKEN_KEY);
     setAdminAuth(false);
   }, []);
   // --------------------------------------------------------------------

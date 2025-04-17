@@ -17,7 +17,7 @@ module.exports = (sequelize, DataTypes) => {
       });
       // 참여 기록은 여러 점수 로그를 가짐 (1:N)
       SessionParticipant.hasMany(models.ScoreLog, {
-        foreignKey: 'participant_id', // ScoreLog의 외래 키 (snake_case)
+        foreignKey: 'participantId', // ScoreLog의 외래 키 (camelCase로 변경)
         as: 'scoreLogs'            // 관계 접근 시 사용할 별칭
       });
     }

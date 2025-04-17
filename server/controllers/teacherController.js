@@ -18,10 +18,10 @@ exports.login = async (req, res) => {
   try {
     // 1. 실제 교사 비밀번호 조회 (DB 우선, 없으면 .env fallback)
     const teacherPasswordSetting = await db.SystemSetting.findOne({
-      where: { setting_key: 'teacher_password' }
+      where: { settingKey: 'teacher_password' }
     });
     // DB 설정 값이 없으면 환경 변수 사용
-    const correctPassword = teacherPasswordSetting ? teacherPasswordSetting.setting_value : process.env.TEACHER_PASSWORD;
+    const correctPassword = teacherPasswordSetting ? teacherPasswordSetting.settingValue : process.env.TEACHER_PASSWORD;
 
     // 비밀번호 설정이 어디에도 없는 경우
     if (!correctPassword) {

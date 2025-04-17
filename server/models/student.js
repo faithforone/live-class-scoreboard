@@ -8,8 +8,8 @@ module.exports = (sequelize, DataTypes) => {
       // 학생은 여러 그룹에 속할 수 있음 (N:M)
       Student.belongsToMany(models.Group, {
         through: models.StudentGroup, // 문자열 대신 모델 객체 사용
-        foreignKey: 'student_id', // 중간 테이블의 학생 ID 외래 키
-        otherKey: 'group_id',     // 중간 테이블의 그룹 ID 외래 키
+        foreignKey: 'studentId', // 중간 테이블의 학생 ID 외래 키 (camelCase로 변경)
+        otherKey: 'groupId',     // 중간 테이블의 그룹 ID 외래 키 (camelCase로 변경)
         as: 'groups'             // 관계 접근 시 사용할 별칭
       });
       // 학생은 여러 세션에 참여할 수 있음 (N:M, SessionParticipant를 통해)

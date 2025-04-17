@@ -9,7 +9,7 @@ module.exports = {
   development: {
     username: process.env.DB_USERNAME || 'sam', // .env 파일의 DB_USERNAME 또는 기본값
     password: process.env.DB_PASSWORD || null,      // .env 파일의 DB_PASSWORD 또는 기본값
-    database: process.env.DB_DATABASE || 'live_class_scoreboard_dev', // .env 또는 기본값
+    database: process.env.DB_DATABASE || 'live_scoreboard', // 수정된 부분
     host: process.env.DB_HOST || '127.0.0.1',       // .env 또는 기본값
     dialect: 'postgres',                             // 수정: postgres 로 변경
     // 필요 시 다른 Sequelize 옵션 추가 가능

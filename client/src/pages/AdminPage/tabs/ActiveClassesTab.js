@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import axios from 'axios';
-import api from '../../../utils/api';
+import * as adminService from '../../../services/adminService';
 
 const Container = styled.div`
   background-color: white;
@@ -129,14 +128,8 @@ function ActiveClassesTab() {
   const fetchActiveSessions = async () => {
     setIsLoading(true);
     try {
-      const adminAuth = JSON.parse(localStorage.getItem('adminAuth') || '{}');
-      const config = {
-        headers: { 'x-auth-token': adminAuth.token || '' }
-      };
-      console.log('Auth config for request:', JSON.stringify(config));
-      
-      const response = await axios.get('/api/admin/active-sessions', config);
-      setActiveSessions(response.data);
+      const data = await adminService.getActiveSessions();
+      setActiveSessions(data);
       setError(null);
     } catch (err) {
       console.error('Error fetching active sessions:', err);
@@ -163,10 +156,7 @@ function ActiveClassesTab() {
     }
     
     try {
-      const adminAuth = JSON.parse(localStorage.getItem('adminAuth') || '{}');
-      await axios.put(`/api/admin/active-sessions/${sessionId}/end`, {}, {
-        headers: { 'x-auth-token': adminAuth.token || '' }
-      });
+      await adminService.forceEndSession(sessionId);
       // Remove ended session from local state to avoid waiting for next refresh
       setActiveSessions(prevSessions => 
         prevSessions.filter(session => session.id !== sessionId)

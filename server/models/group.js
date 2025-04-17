@@ -8,16 +8,16 @@ module.exports = (sequelize, DataTypes) => {
       // 그룹은 여러 학생을 가질 수 있음 (N:M)
       Group.belongsToMany(models.Student, {
         through: models.StudentGroup, // 문자열 대신 모델 객체 사용
-        foreignKey: 'group_id',     // 중간 테이블의 그룹 ID 외래 키
-        otherKey: 'student_id',   // 중간 테이블의 학생 ID 외래 키
+        foreignKey: 'groupId',     // 중간 테이블의 그룹 ID 외래 키 (camelCase로 변경)
+        otherKey: 'studentId',   // 중간 테이블의 학생 ID 외래 키 (camelCase로 변경)
         as: 'students'           // 관계 접근 시 사용할 별칭 (컨트롤러 로직과 일치)
       });
 
       // 그룹은 여러 템플릿에 속할 수 있음 (N:M)
       Group.belongsToMany(models.Template, {
         through: models.TemplateGroup, // 문자열 대신 모델 객체 사용
-        foreignKey: 'group_id',
-        otherKey: 'template_id',
+        foreignKey: 'groupId', // camelCase로 변경
+        otherKey: 'templateId', // camelCase로 변경
         as: 'templates'
       });
     }

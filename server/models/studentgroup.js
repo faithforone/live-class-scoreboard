@@ -9,7 +9,7 @@ module.exports = (sequelize, DataTypes) => {
   }
   
   StudentGroup.init({
-    student_id: {
+    studentId: {
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
@@ -17,7 +17,7 @@ module.exports = (sequelize, DataTypes) => {
         key: 'id'
       }
     },
-    group_id: {
+    groupId: {
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
@@ -29,7 +29,7 @@ module.exports = (sequelize, DataTypes) => {
     sequelize,
     modelName: 'StudentGroup',
     tableName: 'student_groups',
-    underscored: true
+    underscored: false
   });
   
   return StudentGroup;

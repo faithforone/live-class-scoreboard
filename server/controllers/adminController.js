@@ -1,17 +1,17 @@
 const { Student, Group, ClassSession, ScoreLog, SystemSetting, sequelize, StudentGroup, Template } = require('../models');
 const bcrypt = require('bcrypt');
 
-// 학생 목록 조회
+// 학생 목록 조회 (전체)
 exports.getAllStudents = async (req, res) => {
   try {
     const students = await Student.findAll({
-      include: [
-        {
-          model: Group,
-          as: 'groups',
-          through: { attributes: [] } // Don't include junction table attributes
-        }
-      ],
+      attributes: ['id', 'name', 'status', ['current_session_id', 'currentSessionId'], ['created_at', 'createdAt'], ['updated_at', 'updatedAt']],
+      include: [{
+        model: Group,
+        as: 'groups',
+        attributes: ['id', 'name', ['created_at', 'createdAt'], ['updated_at', 'updatedAt']],
+        through: { attributes: [] } // 중간 테이블 속성 제외
+      }],
       order: [['name', 'ASC']]
     });
     
@@ -76,10 +76,10 @@ exports.updateStudent = async (req, res) => {
   const transaction = await sequelize.transaction();
   
   try {
-    const { student_id } = req.params;
+    const { studentId } = req.params;
     const { name, groupIds } = req.body;
     
-    const student = await Student.findByPk(student_id);
+    const student = await Student.findByPk(studentId);
     
     if (!student) {
       await transaction.rollback();
@@ -95,14 +95,14 @@ exports.updateStudent = async (req, res) => {
     if (groupIds !== undefined) {
       // Remove all current group associations
       await StudentGroup.destroy({
-        where: { studentId: student_id },
+        where: { studentId: studentId },
         transaction
       });
       
       // Create new associations if there are any groups
       if (groupIds && groupIds.length > 0) {
         const groupAssociations = groupIds.map(groupId => ({
-          studentId: student_id,
+          studentId: studentId,
           groupId
         }));
         
@@ -113,7 +113,7 @@ exports.updateStudent = async (req, res) => {
     await transaction.commit();
     
     // Fetch the updated student with its groups
-    const updatedStudent = await Student.findByPk(student_id, {
+    const updatedStudent = await Student.findByPk(studentId, {
       include: [
         {
           model: Group,
@@ -136,9 +136,9 @@ exports.deleteStudent = async (req, res) => {
   const transaction = await sequelize.transaction();
   
   try {
-    const { student_id } = req.params;
+    const { studentId } = req.params;
     
-    const student = await Student.findByPk(student_id);
+    const student = await Student.findByPk(studentId);
     
     if (!student) {
       await transaction.rollback();
@@ -153,7 +153,7 @@ exports.deleteStudent = async (req, res) => {
     
     // First delete all associations in the junction table
     await StudentGroup.destroy({
-      where: { studentId: student_id },
+      where: { studentId: studentId },
       transaction
     });
     
@@ -170,17 +170,17 @@ exports.deleteStudent = async (req, res) => {
   }
 };
 
-// 그룹 목록 조회
+// 그룹 목록 조회 (전체)
 exports.getAllGroups = async (req, res) => {
   try {
     const groups = await Group.findAll({
-      attributes: ['id', 'name', 'created_at', 'updated_at'], // Use snake_case column names after migration
+      attributes: ['id', 'name', ['created_at', 'createdAt'], ['updated_at', 'updatedAt']],
       include: [
         {
           model: Student,
           as: 'students',
-          through: { attributes: [] }, // Don't include junction table attributes
-          attributes: ['id', 'name'] // Only include necessary attributes
+          attributes: ['id', 'name'],
+          through: { attributes: [] } // 중간 테이블 속성 제외
         }
       ],
       order: [['name', 'ASC']]
@@ -220,10 +220,10 @@ exports.createGroup = async (req, res) => {
 // 그룹 수정
 exports.updateGroup = async (req, res) => {
   try {
-    const { group_id } = req.params;
+    const { groupId } = req.params;
     const { name } = req.body;
     
-    const group = await Group.findByPk(group_id, {
+    const group = await Group.findByPk(groupId, {
       include: [
         {
           model: Student,
@@ -252,9 +252,9 @@ exports.deleteGroup = async (req, res) => {
   const transaction = await sequelize.transaction();
   
   try {
-    const { group_id } = req.params;
+    const { groupId } = req.params;
     
-    const group = await Group.findByPk(group_id);
+    const group = await Group.findByPk(groupId);
     
     if (!group) {
       await transaction.rollback();
@@ -263,7 +263,7 @@ exports.deleteGroup = async (req, res) => {
     
     // 그룹에 속한 학생 수 확인 (junction table)
     const studentCount = await StudentGroup.count({
-      where: { groupId: group_id }
+      where: { groupId: groupId }
     });
     
     if (studentCount > 0) {
@@ -301,12 +301,12 @@ exports.updatePassword = async (req, res) => {
     
     // 비밀번호 업데이트 또는 생성
     const [setting, created] = await SystemSetting.findOrCreate({
-      where: { setting_key: type },
-      defaults: { setting_value: password }
+      where: { settingKey: type },
+      defaults: { settingValue: password }
     });
     
     if (!created) {
-      await setting.update({ setting_value: password });
+      await setting.update({ settingValue: password });
     }
     
     res.status(200).json({ message: '비밀번호가 업데이트되었습니다.' });
@@ -317,40 +317,54 @@ exports.updatePassword = async (req, res) => {
 };
 
 // 그룹에 학생 추가
-exports.addStudentToGroup = async (req, res) => {
+exports.addStudentsToGroup = async (req, res) => {
   try {
-    const { group_id } = req.params;
-    const { studentId } = req.body;
+    const { groupId } = req.params;
+    const { studentIds } = req.body;
     
     // Check if group exists
-    const group = await Group.findByPk(group_id);
+    const group = await Group.findByPk(groupId);
     if (!group) {
       return res.status(404).json({ message: '그룹을 찾을 수 없습니다.' });
     }
     
-    // Check if student exists
-    const student = await Student.findByPk(studentId);
-    if (!student) {
-      return res.status(404).json({ message: '학생을 찾을 수 없습니다.' });
+    // Validate studentIds array
+    if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0) {
+      return res.status(400).json({ message: '학생 ID 목록이 필요합니다.' });
     }
     
-    // Check if association already exists
-    const existingAssociation = await StudentGroup.findOne({
-      where: { studentId, groupId: group_id }
+    // Check if all students exist
+    const students = await Student.findAll({
+      where: { id: studentIds }
     });
     
-    if (existingAssociation) {
-      return res.status(400).json({ message: '이미 그룹에 속한 학생입니다.' });
+    if (students.length !== studentIds.length) {
+      return res.status(404).json({ message: '존재하지 않는 학생이 포함되어 있습니다.' });
     }
     
-    // Create association
-    await StudentGroup.create({
-      studentId,
-      groupId: group_id
-    });
+    // Create associations for all students
+    const associations = [];
+    for (const studentId of studentIds) {
+      // Check if association already exists
+      const existingAssociation = await StudentGroup.findOne({
+        where: { studentId, groupId }
+      });
+      
+      if (!existingAssociation) {
+        associations.push({
+          studentId,
+          groupId
+        });
+      }
+    }
+    
+    // Create new associations
+    if (associations.length > 0) {
+      await StudentGroup.bulkCreate(associations);
+    }
     
     // Get updated group with students
-    const updatedGroup = await Group.findByPk(group_id, {
+    const updatedGroup = await Group.findByPk(groupId, {
       include: [
         {
           model: Student,
@@ -371,13 +385,13 @@ exports.addStudentToGroup = async (req, res) => {
 // 그룹에서 학생 제거
 exports.removeStudentFromGroup = async (req, res) => {
   try {
-    const { group_id, student_id } = req.params;
+    const { groupId, studentId } = req.params;
     
     // Check if association exists
     const association = await StudentGroup.findOne({
       where: {
-        groupId: group_id,
-        studentId: student_id
+        groupId: groupId,
+        studentId: studentId
       }
     });
     
@@ -389,7 +403,7 @@ exports.removeStudentFromGroup = async (req, res) => {
     await association.destroy();
     
     // Get updated group with students
-    const updatedGroup = await Group.findByPk(group_id, {
+    const updatedGroup = await Group.findByPk(groupId, {
       include: [
         {
           model: Student,
@@ -427,12 +441,12 @@ exports.updateRankingPeriod = async (req, res) => {
     
     // 설정 업데이트 또는 생성
     const [setting, created] = await SystemSetting.findOrCreate({
-      where: { setting_key: settingKey },
-      defaults: { setting_value: settingValue }
+      where: { settingKey: settingKey },
+      defaults: { settingValue: settingValue }
     });
     
     if (!created) {
-      await setting.update({ setting_value: settingValue });
+      await setting.update({ settingValue: settingValue });
     }
     
     res.status(200).json({ message: '랭킹 기간이 설정되었습니다.' });
@@ -447,14 +461,12 @@ exports.getActiveSessions = async (req, res) => {
   try {
     const activeSessions = await ClassSession.findAll({
       where: {
-        status: '진행 중'
+        status: 'active'
       },
       include: [
         {
           model: Student,
-          as: 'currentStudents',
-          // Excluding join table attributes to avoid column name conflicts
-          through: { attributes: [] }
+          as: 'currentStudents'
         },
         {
           model: Template,
@@ -465,7 +477,7 @@ exports.getActiveSessions = async (req, res) => {
           as: 'group'
         }
       ],
-      order: [['start_time', 'DESC']]  // Changed back to snake_case
+      order: [['startTime', 'DESC']]
     });
 
     res.status(200).json(activeSessions);
@@ -483,9 +495,9 @@ exports.forceEndSession = async (req, res) => {
   const t = await sequelize.transaction();
   
   try {
-    const { session_id } = req.params;
+    const { sessionId } = req.params;
     
-    const session = await ClassSession.findByPk(session_id, { transaction: t });
+    const session = await ClassSession.findByPk(sessionId, { transaction: t });
     
     if (!session) {
       await t.rollback();
@@ -501,7 +513,7 @@ exports.forceEndSession = async (req, res) => {
     await session.update(
       { 
         status: '종료됨',
-        end_time: new Date()  // Changed back to snake_case
+        endTime: new Date()
       },
       { transaction: t }
     );
@@ -510,10 +522,10 @@ exports.forceEndSession = async (req, res) => {
     await Student.update(
       { 
         status: '대기중',
-        current_session_id: null  // Changed back to snake_case
+        currentSessionId: null
       },
       { 
-        where: { current_session_id: session_id },  // Changed back to snake_case
+        where: { currentSessionId: sessionId },
         transaction: t
       }
     );
@@ -538,7 +550,7 @@ exports.getCompletedSessions = async (req, res) => {
       where: { status: '종료됨' },
       limit: parseInt(limit),
       offset: parseInt(offset),
-      order: [['end_time', 'DESC']]  // Changed back to snake_case
+      order: [['endTime', 'DESC']]  // snake_case에서 camelCase로 변경
     });
     
     res.status(200).json({
@@ -559,10 +571,10 @@ exports.getCompletedSessions = async (req, res) => {
 // 특정 세션의 점수 로그 조회
 exports.getSessionScoreLogs = async (req, res) => {
   try {
-    const { session_id } = req.params;
+    const { sessionId } = req.params;
     
     const scoreLogs = await ScoreLog.findAll({
-      where: { session_id: session_id },  // Changed back to snake_case
+      where: { sessionId: sessionId },
       include: [
         {
           model: Student,
@@ -596,7 +608,7 @@ exports.resetScores = async (req, res) => {
     
     // 특정 학생들만 초기화
     if (studentIds && studentIds.length > 0) {
-      whereClause.student_id = studentIds;  // Changed back to snake_case
+      whereClause.studentId = studentIds;  // snake_case에서 camelCase로 변경
     }
     
     // 특정 기간 초기화
@@ -628,9 +640,9 @@ exports.resetScores = async (req, res) => {
 exports.getSystemSettings = async (req, res) => {
   try {
     const settings = await SystemSetting.findAll({
-      attributes: ['setting_key', 'setting_value'],
+      attributes: ['settingKey', 'settingValue'],
       where: {
-        setting_key: {
+        settingKey: {
           [sequelize.Op.notIn]: ['admin_password', 'teacher_password']
         }
       }
@@ -640,14 +652,14 @@ exports.getSystemSettings = async (req, res) => {
     
     settings.forEach(setting => {
       // 랭킹 기간 설정은 JSON 파싱
-      if (setting.setting_key.startsWith('ranking_period_')) {
+      if (setting.settingKey.startsWith('ranking_period_')) {
         try {
-          formattedSettings[setting.setting_key] = JSON.parse(setting.setting_value);
+          formattedSettings[setting.settingKey] = JSON.parse(setting.settingValue);
         } catch (e) {
-          formattedSettings[setting.setting_key] = setting.setting_value;
+          formattedSettings[setting.settingKey] = setting.settingValue;
         }
       } else {
-        formattedSettings[setting.setting_key] = setting.setting_value;
+        formattedSettings[setting.settingKey] = setting.settingValue;
       }
     });
     
