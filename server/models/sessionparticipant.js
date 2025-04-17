@@ -7,17 +7,17 @@ module.exports = (sequelize, DataTypes) => {
     static associate(models) {
       // 참여 기록은 특정 세션에 속함 (N:1)
       SessionParticipant.belongsTo(models.ClassSession, {
-        foreignKey: 'sessionId', // 현재 모델의 외래 키
+        foreignKey: 'session_id', // 현재 모델의 외래 키 (snake_case)
         as: 'session'           // 관계 접근 시 사용할 별칭
       });
       // 참여 기록은 특정 학생에 속함 (N:1)
       SessionParticipant.belongsTo(models.Student, {
-        foreignKey: 'studentId', // 현재 모델의 외래 키
+        foreignKey: 'student_id', // 현재 모델의 외래 키 (snake_case)
         as: 'student'           // 관계 접근 시 사용할 별칭
       });
       // 참여 기록은 여러 점수 로그를 가짐 (1:N)
       SessionParticipant.hasMany(models.ScoreLog, {
-        foreignKey: 'participantId', // ScoreLog의 외래 키
+        foreignKey: 'participant_id', // ScoreLog의 외래 키 (snake_case)
         as: 'scoreLogs'            // 관계 접근 시 사용할 별칭
       });
     }
@@ -30,7 +30,7 @@ module.exports = (sequelize, DataTypes) => {
       primaryKey: true,
       allowNull: false
     },
-    sessionId: { // ClassSession FK
+    session_id: { // Changed from sessionId to session_id
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
@@ -39,7 +39,7 @@ module.exports = (sequelize, DataTypes) => {
       },
       onDelete: 'CASCADE' // 세션 삭제 시 참여 기록도 삭제
     },
-    studentId: { // Student FK
+    student_id: { // Changed from studentId to student_id
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
@@ -59,11 +59,12 @@ module.exports = (sequelize, DataTypes) => {
     modelName: 'SessionParticipant',
     tableName: 'session_participants', // 실제 테이블 이름
     timestamps: true,
+    underscored: true, // Use snake_case column names in the database
     // 세션 내 학생 참여는 고유해야 하므로 복합 고유 인덱스 추가 가능
     indexes: [
       {
         unique: true,
-        fields: ['sessionId', 'studentId']
+        fields: ['session_id', 'student_id'] // Changed to snake_case
       }
     ]
   });

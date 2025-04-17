@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
-const { verifyAdminPassword } = require('../middlewares/auth');
+const { auth } = require('../middleware/auth');
 
 // Admin login route (needs to be before the middleware)
 router.post('/login', (req, res) => {
@@ -28,8 +28,8 @@ router.post('/login', (req, res) => {
   }
 });
 
-// 관리자 인증 미들웨어 적용 (비밀번호 확인)
-router.use(verifyAdminPassword);
+// 관리자 인증 미들웨어 적용 (JWT 토큰 확인)
+router.use(auth);
 
 // 학생 관리
 router.get('/students', adminController.getAllStudents);

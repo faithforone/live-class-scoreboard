@@ -50,16 +50,16 @@ const TabBar = styled.div`
 
 const Tab = styled.button`
   padding: 12px 20px;
-  background-color: ${props => props.active ? '#3f51b5' : 'transparent'};
-  color: ${props => props.active ? 'white' : '#555'};
+  background-color: ${props => props.$active ? '#3f51b5' : 'transparent'};
+  color: ${props => props.$active ? 'white' : '#555'};
   border: none;
   cursor: pointer;
   font-size: 16px;
-  font-weight: ${props => props.active ? 'bold' : 'normal'};
+  font-weight: ${props => props.$active ? 'bold' : 'normal'};
   transition: all 0.3s ease;
   
   &:hover {
-    background-color: ${props => props.active ? '#3f51b5' : '#f0f0f0'};
+    background-color: ${props => props.$active ? '#3f51b5' : '#f0f0f0'};
   }
 `;
 
@@ -83,31 +83,31 @@ function AdminDashboard() {
       
       <TabBar>
         <Tab 
-          active={activeTab === 'active-classes'} 
+          $active={activeTab === 'active-classes'} 
           onClick={() => setActiveTab('active-classes')}
         >
           현재 수업
         </Tab>
         <Tab 
-          active={activeTab === 'students'} 
+          $active={activeTab === 'students'} 
           onClick={() => setActiveTab('students')}
         >
           학생 관리
         </Tab>
         <Tab 
-          active={activeTab === 'groups'} 
+          $active={activeTab === 'groups'} 
           onClick={() => setActiveTab('groups')}
         >
           그룹 관리
         </Tab>
         <Tab 
-          active={activeTab === 'templates'} 
+          $active={activeTab === 'templates'} 
           onClick={() => setActiveTab('templates')}
         >
           수업 템플릿
         </Tab>
         <Tab 
-          active={activeTab === 'settings'} 
+          $active={activeTab === 'settings'} 
           onClick={() => setActiveTab('settings')}
         >
           설정

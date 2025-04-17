@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import axios from 'axios';
+import api from '../../../utils/api';
 
 const Container = styled.div`
   background-color: white;
@@ -30,16 +31,16 @@ const SearchInput = styled.input`
 `;
 
 const Button = styled.button`
-  background-color: ${props => props.danger ? '#f44336' : props.primary ? '#3f51b5' : '#f0f0f0'};
-  color: ${props => (props.danger || props.primary) ? 'white' : '#333'};
+  background-color: ${props => props.$danger ? '#f44336' : props.$primary ? '#3f51b5' : '#f0f0f0'};
+  color: ${props => (props.$danger || props.$primary) ? 'white' : '#333'};
   border: none;
   padding: 10px 15px;
   border-radius: 4px;
   cursor: pointer;
-  font-weight: ${props => props.bold ? 'bold' : 'normal'};
+  font-weight: ${props => props.$bold ? 'bold' : 'normal'};
   
   &:hover {
-    background-color: ${props => props.danger ? '#d32f2f' : props.primary ? '#303f9f' : '#e0e0e0'};
+    background-color: ${props => props.$danger ? '#d32f2f' : props.$primary ? '#303f9f' : '#e0e0e0'};
   }
   
   &:disabled {
@@ -98,7 +99,7 @@ const Badge = styled.span`
   border-radius: 12px;
   font-size: 12px;
   font-weight: bold;
-  background-color: ${props => props.active ? '#4caf50' : '#9e9e9e'};
+  background-color: ${props => props.$active ? '#4caf50' : '#9e9e9e'};
   color: white;
 `;
 
@@ -246,25 +247,13 @@ function StudentsTab() {
     groupIds: []
   });
   
-  // Add this function at the top of the component
-  const getAuthConfig = () => {
-    try {
-      const adminAuth = JSON.parse(localStorage.getItem('adminAuth') || '{}');
-      return {
-        headers: {
-          'x-auth-token': adminAuth.token || ''
-        }
-      };
-    } catch (err) {
-      console.error('Error parsing auth token:', err);
-      return { headers: {} };
-    }
-  };
-  
   const fetchStudents = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get('/api/admin/students', getAuthConfig());
+      const adminAuth = JSON.parse(localStorage.getItem('adminAuth') || '{}');
+      const response = await axios.get('/api/admin/students', {
+        headers: { 'x-auth-token': adminAuth.token || '' }
+      });
       setStudents(response.data);
       setError(null);
     } catch (err) {
@@ -277,7 +266,10 @@ function StudentsTab() {
   
   const fetchGroups = async () => {
     try {
-      const response = await axios.get('/api/admin/groups', getAuthConfig());
+      const adminAuth = JSON.parse(localStorage.getItem('adminAuth') || '{}');
+      const response = await axios.get('/api/admin/groups', {
+        headers: { 'x-auth-token': adminAuth.token || '' }
+      });
       setGroups(response.data);
     } catch (err) {
       console.error('Error fetching groups:', err);
@@ -348,23 +340,30 @@ function StudentsTab() {
     });
   };
   
-  const handleSubmit = async (e) => {
+  const handleFormSubmit = async (e) => {
     e.preventDefault();
     
     try {
+      const adminAuth = JSON.parse(localStorage.getItem('adminAuth') || '{}');
+      const config = {
+        headers: { 'x-auth-token': adminAuth.token || '' }
+      };
+      
       if (modalMode === 'add') {
-        // Add new student
-        const response = await axios.post('/api/admin/students', formData);
-        setStudents([...students, response.data]);
+        // Add mode
+        await axios.post('/api/admin/students', formData, config);
+        
+        // Refresh the students list
+        fetchStudents();
       } else {
-        // Edit existing student
-        const response = await axios.put(`/api/admin/students/${currentStudent.id}`, formData);
-        setStudents(students.map(student => 
-          student.id === currentStudent.id ? response.data : student
-        ));
+        // Edit mode
+        await axios.put(`/api/admin/students/${currentStudent.id}`, formData, config);
+        
+        // Refresh to get updated data with groups
+        fetchStudents();
       }
       
-      // Close modal after successful operation
+      // Close the modal after submission
       setShowModal(false);
     } catch (err) {
       setError(modalMode === 'add' ? '학생 추가 중 오류가 발생했습니다.' : '학생 정보 수정 중 오류가 발생했습니다.');
@@ -394,7 +393,7 @@ function StudentsTab() {
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
-        <Button primary onClick={handleAddClick}>+ 학생 추가</Button>
+        <Button $primary onClick={handleAddClick}>+ 학생 추가</Button>
       </ActionsRow>
       
       {!isLoading && filteredStudents.length === 0 ? (
@@ -424,7 +423,7 @@ function StudentsTab() {
                   ))}
                 </td>
                 <td>
-                  <Badge active={student.status === '수업중'}>
+                  <Badge $active={student.status === '수업중'}>
                     {student.status}
                   </Badge>
                 </td>
@@ -433,7 +432,7 @@ function StudentsTab() {
                   <ActionButtons>
                     <Button onClick={() => handleEditClick(student)}>수정</Button>
                     <Button 
-                      danger 
+                      $danger 
                       onClick={() => handleDeleteClick(student.id)}
                       disabled={student.status === '수업중'}
                     >
@@ -456,7 +455,7 @@ function StudentsTab() {
               <CloseButton onClick={() => setShowModal(false)}>&times;</CloseButton>
             </ModalHeader>
             
-            <Form onSubmit={handleSubmit}>
+            <Form onSubmit={handleFormSubmit}>
               <FormGroup>
                 <label htmlFor="name">이름</label>
                 <input 
@@ -487,7 +486,7 @@ function StudentsTab() {
               
               <ModalFooter>
                 <Button onClick={() => setShowModal(false)}>취소</Button>
-                <Button primary type="submit">
+                <Button $primary type="submit">
                   {modalMode === 'add' ? '추가' : '저장'}
                 </Button>
               </ModalFooter>

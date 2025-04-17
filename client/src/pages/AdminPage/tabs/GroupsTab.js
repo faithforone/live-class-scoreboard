@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import axios from 'axios';
+import api from '../../../utils/api';
 
 const Container = styled.div`
   background-color: white;
@@ -21,16 +22,16 @@ const ActionsRow = styled.div`
 `;
 
 const Button = styled.button`
-  background-color: ${props => props.danger ? '#f44336' : props.primary ? '#3f51b5' : '#f0f0f0'};
-  color: ${props => (props.danger || props.primary) ? 'white' : '#333'};
+  background-color: ${props => props.$danger ? '#f44336' : props.$primary ? '#3f51b5' : '#f0f0f0'};
+  color: ${props => (props.$danger || props.$primary) ? 'white' : '#333'};
   border: none;
   padding: 10px 15px;
   border-radius: 4px;
   cursor: pointer;
-  font-weight: ${props => props.bold ? 'bold' : 'normal'};
+  font-weight: ${props => props.$bold ? 'bold' : 'normal'};
   
   &:hover {
-    background-color: ${props => props.danger ? '#d32f2f' : props.primary ? '#303f9f' : '#e0e0e0'};
+    background-color: ${props => props.$danger ? '#d32f2f' : props.$primary ? '#303f9f' : '#e0e0e0'};
   }
   
   &:disabled {
@@ -221,7 +222,10 @@ function GroupsTab() {
   const fetchGroups = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get('/api/admin/groups', getAuthConfig());
+      const adminAuth = JSON.parse(localStorage.getItem('adminAuth') || '{}');
+      const response = await axios.get('/api/admin/groups', {
+        headers: { 'x-auth-token': adminAuth.token || '' }
+      });
       // The API now returns groups with their students included
       setGroups(response.data);
       setError(null);
@@ -283,27 +287,39 @@ function GroupsTab() {
     });
   };
   
-  const handleSubmit = async (e) => {
+  const handleFormSubmit = async (e) => {
     e.preventDefault();
     
     try {
+      const adminAuth = JSON.parse(localStorage.getItem('adminAuth') || '{}');
+      const config = {
+        headers: { 'x-auth-token': adminAuth.token || '' }
+      };
+
       if (modalMode === 'add') {
-        // Add new group
-        const response = await axios.post('/api/admin/groups', formData);
-        setGroups([...groups, response.data]);
+        // Add mode
+        await axios.post('/api/admin/groups', formData, config);
+        
+        // Refresh the group list
+        fetchGroups();
       } else {
-        // Edit existing group
-        const response = await axios.put(`/api/admin/groups/${currentGroup.id}`, formData);
-        setGroups(groups.map(group => 
-          group.id === currentGroup.id ? response.data : group
-        ));
+        // Edit mode
+        await axios.put(`/api/admin/groups/${currentGroup.id}`, formData, config);
+        
+        // Update in UI without a full reload
+        setGroups(groups.map(group => {
+          if (group.id === currentGroup.id) {
+            return { ...group, ...formData };
+          }
+          return group;
+        }));
       }
       
-      // Close modal after successful operation
+      // Close the modal after submission
       setShowModal(false);
     } catch (err) {
-      setError(modalMode === 'add' ? '그룹 추가 중 오류가 발생했습니다.' : '그룹 정보 수정 중 오류가 발생했습니다.');
-      console.error(`Error ${modalMode === 'add' ? 'adding' : 'updating'} group:`, err);
+      setError('그룹 추가 중 오류가 발생했습니다.');
+      console.error('Error submitting group:', err);
     }
   };
   
@@ -319,7 +335,7 @@ function GroupsTab() {
       
       <ActionsRow>
         <div></div> {/* Placeholder for alignment */}
-        <Button primary onClick={handleAddClick}>+ 그룹 추가</Button>
+        <Button $primary onClick={handleAddClick}>+ 그룹 추가</Button>
       </ActionsRow>
       
       {!isLoading && groups.length === 0 ? (
@@ -348,7 +364,7 @@ function GroupsTab() {
                   <ActionButtons>
                     <Button onClick={() => handleEditClick(group)}>수정</Button>
                     <Button 
-                      danger 
+                      $danger 
                       onClick={() => handleDeleteClick(group.id)}
                       disabled={group.students && group.students.length > 0}
                     >
@@ -371,7 +387,7 @@ function GroupsTab() {
               <CloseButton onClick={() => setShowModal(false)}>&times;</CloseButton>
             </ModalHeader>
             
-            <Form onSubmit={handleSubmit}>
+            <Form onSubmit={handleFormSubmit}>
               <FormGroup>
                 <label htmlFor="name">그룹 이름</label>
                 <input 
@@ -386,7 +402,7 @@ function GroupsTab() {
               
               <ModalFooter>
                 <Button onClick={() => setShowModal(false)}>취소</Button>
-                <Button primary type="submit">
+                <Button $primary type="submit">
                   {modalMode === 'add' ? '추가' : '저장'}
                 </Button>
               </ModalFooter>

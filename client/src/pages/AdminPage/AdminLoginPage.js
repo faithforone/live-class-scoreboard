@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../../utils/api';
 
 const Container = styled.div`
   max-width: 400px;
@@ -93,13 +93,10 @@ function AdminLoginPage() {
     try {
       // For demonstration, using a simple token generation
       // In production, you would validate against your backend
-      const response = await axios.post('/api/admin/login', { password });
+      const response = await api.post('/admin/login', { password });
       
-      // Store auth data in localStorage
-      localStorage.setItem('adminAuth', JSON.stringify({
-        token: response.data.token,
-        role: 'admin'
-      }));
+      // Store auth data in localStorage - store the full token object not just the token string
+      localStorage.setItem('adminAuth', JSON.stringify({ token: response.data.token }));
       
       // Redirect to dashboard
       navigate('/admin/dashboard');
@@ -113,10 +110,7 @@ function AdminLoginPage() {
   
   // Simple login for development
   const handleDevLogin = () => {
-    localStorage.setItem('adminAuth', JSON.stringify({
-      token: 'dev-token-123',
-      role: 'admin'
-    }));
+    localStorage.setItem('adminAuth', JSON.stringify({ token: 'dev-token-123' }));
     navigate('/admin/dashboard');
   };
   

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import axios from 'axios';
+import api from '../../../utils/api';
 
 const Container = styled.div`
   background-color: white;
@@ -30,16 +31,16 @@ const SearchInput = styled.input`
 `;
 
 const Button = styled.button`
-  background-color: ${props => props.danger ? '#f44336' : props.primary ? '#3f51b5' : '#f0f0f0'};
-  color: ${props => (props.danger || props.primary) ? 'white' : '#333'};
+  background-color: ${props => props.$danger ? '#f44336' : props.$primary ? '#3f51b5' : '#f0f0f0'};
+  color: ${props => (props.$danger || props.$primary) ? 'white' : '#333'};
   border: none;
   padding: 10px 15px;
   border-radius: 4px;
   cursor: pointer;
-  font-weight: ${props => props.bold ? 'bold' : 'normal'};
+  font-weight: ${props => props.$bold ? 'bold' : 'normal'};
   
   &:hover {
-    background-color: ${props => props.danger ? '#d32f2f' : props.primary ? '#303f9f' : '#e0e0e0'};
+    background-color: ${props => props.$danger ? '#d32f2f' : props.$primary ? '#303f9f' : '#e0e0e0'};
   }
   
   &:disabled {
@@ -98,7 +99,7 @@ const Badge = styled.span`
   border-radius: 12px;
   font-size: 12px;
   font-weight: bold;
-  background-color: ${props => props.active ? '#4caf50' : '#9e9e9e'};
+  background-color: ${props => props.$active ? '#4caf50' : '#9e9e9e'};
   color: white;
 `;
 
@@ -276,25 +277,13 @@ function TemplatesTab() {
   const [selectedGroups, setSelectedGroups] = useState([]);
   const [availableGroups, setAvailableGroups] = useState([]);
 
-  // Replace current getAuthConfig-like functions with this consistent one
-  const getAuthConfig = () => {
-    try {
-      const adminAuth = JSON.parse(localStorage.getItem('adminAuth') || '{}');
-      return {
-        headers: {
-          'x-auth-token': adminAuth.token || ''
-        }
-      };
-    } catch (err) {
-      console.error('Error parsing auth token:', err);
-      return { headers: {} };
-    }
-  };
-
   const fetchTemplates = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get('/api/templates', getAuthConfig());
+      const adminAuth = JSON.parse(localStorage.getItem('adminAuth') || '{}');
+      const response = await axios.get('/api/templates', {
+        headers: { 'x-auth-token': adminAuth.token || '' }
+      });
       setTemplates(response.data);
       setError(null);
     } catch (err) {
@@ -307,7 +296,10 @@ function TemplatesTab() {
   
   const fetchGroups = async () => {
     try {
-      const response = await axios.get('/api/admin/groups', getAuthConfig());
+      const adminAuth = JSON.parse(localStorage.getItem('adminAuth') || '{}');
+      const response = await axios.get('/api/admin/groups', {
+        headers: { 'x-auth-token': adminAuth.token || '' }
+      });
       setGroups(response.data);
     } catch (err) {
       console.error('Error fetching groups:', err);
@@ -348,7 +340,9 @@ function TemplatesTab() {
     
     try {
       // Get current template groups
-      const response = await axios.get(`/api/templates/${template.id}/groups`, getAuthConfig());
+      const response = await axios.get(`/api/templates/${template.id}/groups`, {
+        headers: { 'x-auth-token': JSON.parse(localStorage.getItem('adminAuth') || '{}').token || '' }
+      });
       const templateGroups = response.data;
       
       // Set selected groups
@@ -371,7 +365,9 @@ function TemplatesTab() {
     }
     
     try {
-      await axios.delete(`/api/templates/${templateId}`, getAuthConfig());
+      await axios.delete(`/api/templates/${templateId}`, {
+        headers: { 'x-auth-token': JSON.parse(localStorage.getItem('adminAuth') || '{}').token || '' }
+      });
       
       // Update local state
       setTemplates(templates.filter(template => template.id !== templateId));
@@ -432,7 +428,9 @@ function TemplatesTab() {
   
   const handleAddGroupToTemplate = async (groupId) => {
     try {
-      const response = await axios.post(`/api/templates/${currentTemplate.id}/groups/${groupId}`, {}, getAuthConfig());
+      const response = await axios.post(`/api/templates/${currentTemplate.id}/groups/${groupId}`, {}, {
+        headers: { 'x-auth-token': JSON.parse(localStorage.getItem('adminAuth') || '{}').token || '' }
+      });
       
       // Update selected groups
       const addedGroup = groups.find(g => g.id === groupId);
@@ -453,7 +451,9 @@ function TemplatesTab() {
   
   const handleRemoveGroupFromTemplate = async (groupId) => {
     try {
-      await axios.delete(`/api/templates/${currentTemplate.id}/groups/${groupId}`, getAuthConfig());
+      await axios.delete(`/api/templates/${currentTemplate.id}/groups/${groupId}`, {
+        headers: { 'x-auth-token': JSON.parse(localStorage.getItem('adminAuth') || '{}').token || '' }
+      });
       
       // Update selected groups
       const removedGroup = selectedGroups.find(g => g.id === groupId);
@@ -483,11 +483,15 @@ function TemplatesTab() {
     try {
       if (modalMode === 'add') {
         // Add new template
-        const response = await axios.post('/api/templates', formData, getAuthConfig());
+        const response = await axios.post('/api/templates', formData, {
+          headers: { 'x-auth-token': JSON.parse(localStorage.getItem('adminAuth') || '{}').token || '' }
+        });
         setTemplates([...templates, response.data]);
       } else if (modalMode === 'edit') {
         // Edit existing template
-        const response = await axios.put(`/api/templates/${currentTemplate.id}`, formData, getAuthConfig());
+        const response = await axios.put(`/api/templates/${currentTemplate.id}`, formData, {
+          headers: { 'x-auth-token': JSON.parse(localStorage.getItem('adminAuth') || '{}').token || '' }
+        });
         setTemplates(templates.map(template => 
           template.id === currentTemplate.id ? response.data : template
         ));
@@ -523,7 +527,7 @@ function TemplatesTab() {
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
-        <Button primary onClick={handleAddClick}>+ 템플릿 추가</Button>
+        <Button $primary onClick={handleAddClick}>+ 템플릿 추가</Button>
       </ActionsRow>
       
       {!isLoading && filteredTemplates.length === 0 ? (
@@ -556,7 +560,7 @@ function TemplatesTab() {
                   ))}
                 </td>
                 <td>
-                  <Badge active={template.isActive}>
+                  <Badge $active={template.isActive}>
                     {template.isActive ? '활성' : '비활성'}
                   </Badge>
                 </td>
@@ -565,7 +569,7 @@ function TemplatesTab() {
                     <Button onClick={() => handleEditClick(template)}>수정</Button>
                     <Button onClick={() => handleGroupsClick(template)}>그룹</Button>
                     <Button 
-                      danger 
+                      $danger 
                       onClick={() => handleDeleteClick(template.id)}
                     >
                       삭제
@@ -611,7 +615,7 @@ function TemplatesTab() {
                           <td>{group.name}</td>
                           <td>
                             <Button 
-                              danger 
+                              $danger 
                               onClick={() => handleRemoveGroupFromTemplate(group.id)}
                             >
                               제거
@@ -640,7 +644,7 @@ function TemplatesTab() {
                           <td>{group.name}</td>
                           <td>
                             <Button 
-                              primary 
+                              $primary 
                               onClick={() => handleAddGroupToTemplate(group.id)}
                             >
                               추가
@@ -709,7 +713,7 @@ function TemplatesTab() {
                           <div><strong>{metric.name}</strong> (최대 점수: {metric.maxScore})</div>
                           {metric.description && <div>{metric.description}</div>}
                           <MetricActions>
-                            <Button danger onClick={() => handleDeleteMetric(index)}>삭제</Button>
+                            <Button $danger onClick={() => handleDeleteMetric(index)}>삭제</Button>
                           </MetricActions>
                         </MetricItem>
                       ))
@@ -757,7 +761,7 @@ function TemplatesTab() {
                 
                 <ModalFooter>
                   <Button onClick={() => setShowModal(false)}>취소</Button>
-                  <Button primary type="submit">
+                  <Button $primary type="submit">
                     {modalMode === 'add' ? '추가' : '저장'}
                   </Button>
                 </ModalFooter>

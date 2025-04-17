@@ -1,4 +1,4 @@
-const { Student, Group, ClassSession, ScoreLog, SystemSetting, sequelize, StudentGroup } = require('../models');
+const { Student, Group, ClassSession, ScoreLog, SystemSetting, sequelize, StudentGroup, Template } = require('../models');
 const bcrypt = require('bcrypt');
 
 // 학생 목록 조회
@@ -441,25 +441,39 @@ exports.updateRankingPeriod = async (req, res) => {
   }
 };
 
-// 활성 수업 세션 목록 조회
+// 활성화된(진행 중인) 수업 세션 목록 조회
 exports.getActiveSessions = async (req, res) => {
   try {
     const activeSessions = await ClassSession.findAll({
-      where: { status: '활성' },
+      where: {
+        status: '진행 중'
+      },
       include: [
         {
           model: Student,
           as: 'currentStudents',
-          attributes: ['student_id', 'name']
+          // Excluding join table attributes to avoid column name conflicts
+          through: { attributes: [] }
+        },
+        {
+          model: Template,
+          as: 'template'
+        },
+        {
+          model: Group,
+          as: 'group'
         }
       ],
-      order: [['start_time', 'DESC']]
+      order: [['start_time', 'DESC']]  // Fixed column name to use snake_case
     });
-    
+
     res.status(200).json(activeSessions);
   } catch (error) {
-    console.error('활성 수업 세션 조회 오류:', error);
-    res.status(500).json({ message: '활성 수업 세션 목록을 조회하는 중 오류가 발생했습니다.' });
+    console.error('활성화된 수업 세션 조회 오류:', error);
+    res.status(500).json({ 
+      message: '활성화된 수업 세션 목록을 조회하는 중 오류가 발생했습니다.',
+      error: error.message 
+    });
   }
 };
 
@@ -523,7 +537,7 @@ exports.getCompletedSessions = async (req, res) => {
       where: { status: '종료됨' },
       limit: parseInt(limit),
       offset: parseInt(offset),
-      order: [['end_time', 'DESC']]
+      order: [['end_time', 'DESC']]  // Fixed column name to use snake_case
     });
     
     res.status(200).json({
@@ -534,7 +548,10 @@ exports.getCompletedSessions = async (req, res) => {
     });
   } catch (error) {
     console.error('종료된 수업 세션 조회 오류:', error);
-    res.status(500).json({ message: '종료된 수업 세션 목록을 조회하는 중 오류가 발생했습니다.' });
+    res.status(500).json({ 
+      message: '종료된 수업 세션 목록을 조회하는 중 오류가 발생했습니다.',
+      error: error.message 
+    });
   }
 };
 
@@ -544,12 +561,12 @@ exports.getSessionScoreLogs = async (req, res) => {
     const { session_id } = req.params;
     
     const scoreLogs = await ScoreLog.findAll({
-      where: { session_id },
+      where: { session_id: session_id },
       include: [
         {
           model: Student,
           as: 'student',
-          attributes: ['student_id', 'name']
+          attributes: ['id', 'name']
         }
       ],
       order: [['timestamp', 'DESC']]

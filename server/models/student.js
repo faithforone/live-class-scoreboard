@@ -7,26 +7,26 @@ module.exports = (sequelize, DataTypes) => {
     static associate(models) {
       // 학생은 여러 그룹에 속할 수 있음 (N:M)
       Student.belongsToMany(models.Group, {
-        through: 'StudentGroup', // 중간 테이블 이름 (자동 생성 또는 지정)
-        foreignKey: 'studentId', // 중간 테이블의 학생 ID 외래 키
-        otherKey: 'groupId',     // 중간 테이블의 그룹 ID 외래 키
+        through: 'student_groups', // 중간 테이블 이름 (snake_case)
+        foreignKey: 'student_id', // 중간 테이블의 학생 ID 외래 키
+        otherKey: 'group_id',     // 중간 테이블의 그룹 ID 외래 키
         as: 'groups'             // 관계 접근 시 사용할 별칭
       });
       // 학생은 여러 세션에 참여할 수 있음 (N:M, SessionParticipant를 통해)
       Student.belongsToMany(models.ClassSession, {
         through: models.SessionParticipant, // 중간 모델 사용
-        foreignKey: 'studentId',          // SessionParticipant의 학생 ID 외래 키
-        otherKey: 'sessionId',            // SessionParticipant의 세션 ID 외래 키
+        foreignKey: 'student_id',          // SessionParticipant의 학생 ID 외래 키
+        otherKey: 'session_id',            // SessionParticipant의 세션 ID 외래 키
         as: 'sessions'                    // 관계 접근 시 사용할 별칭
       });
       // 학생은 여러 세션 참여 기록(점수 등)을 가짐 (1:N)
       Student.hasMany(models.SessionParticipant, {
-        foreignKey: 'studentId',          // SessionParticipant의 학생 ID 외래 키
+        foreignKey: 'student_id',          // SessionParticipant의 학생 ID 외래 키
         as: 'sessionParticipants'         // 관계 접근 시 사용할 별칭
       });
       // 학생은 현재 특정 세션에 속할 수 있음 (1:1 또는 1:N, Null 가능)
       Student.belongsTo(models.ClassSession, {
-        foreignKey: 'currentSessionId', // 학생 테이블의 세션 ID 외래 키
+        foreignKey: 'current_session_id', // 학생 테이블의 세션 ID 외래 키
         as: 'currentSession',         // 관계 접근 시 사용할 별칭
         allowNull: true              // 현재 세션이 없을 수도 있음
       });
@@ -48,7 +48,7 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false, // 기본값을 가지므로 false 권장
       defaultValue: '대기중'
     },
-    currentSessionId: { // FK 정의 (타입은 class_sessions.id 와 일치해야 함)
+    current_session_id: { // Changed from camelCase to snake_case
       type: DataTypes.INTEGER,
       allowNull: true, // 현재 세션이 없을 수 있음
       references: {
@@ -63,7 +63,8 @@ module.exports = (sequelize, DataTypes) => {
     sequelize,
     modelName: 'Student',
     tableName: 'students',
-    timestamps: true // createdAt, updatedAt 자동 관리
+    timestamps: true, // createdAt, updatedAt 자동 관리
+    underscored: true // Use snake_case column names in the database
   });
   return Student;
 };

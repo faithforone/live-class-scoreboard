@@ -3,20 +3,26 @@ const { SystemSetting } = require('../models');
 
 // Authentication middleware
 const auth = async function (req, res, next) {
+  console.log('Auth middleware called, headers:', req.headers);
+  
   // Get token from header
   const token = req.header('x-auth-token') || 
     (req.headers.authorization && req.headers.authorization.startsWith('Bearer ') 
       ? req.headers.authorization.split(' ')[1] 
       : null);
+  
+  console.log('Token extracted:', token);
 
   // Check if no token
   if (!token) {
+    console.log('No token found in request');
     return res.status(401).json({ message: 'No token, authorization denied' });
   }
 
   try {
     // For development mode, allow a bypass token
     if (process.env.NODE_ENV === 'development' && token === 'dev-token-123') {
+      console.log('Using development bypass token');
       req.user = { role: 'admin' };
       next();
       return;

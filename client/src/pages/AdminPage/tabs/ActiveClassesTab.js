@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import axios from 'axios';
+import api from '../../../utils/api';
 
 const Container = styled.div`
   background-color: white;
@@ -76,11 +77,11 @@ const Participant = styled.div`
 
 const Score = styled.span`
   font-weight: bold;
-  color: ${props => props.value >= 0 ? '#4caf50' : '#f44336'};
+  color: ${props => props.$value >= 0 ? '#4caf50' : '#f44336'};
 `;
 
 const ActionButton = styled.button`
-  background-color: ${props => props.danger ? '#f44336' : '#4caf50'};
+  background-color: ${props => props.$danger ? '#f44336' : '#4caf50'};
   color: white;
   border: none;
   padding: 8px 12px;
@@ -90,7 +91,7 @@ const ActionButton = styled.button`
   margin-top: auto;
   
   &:hover {
-    background-color: ${props => props.danger ? '#d32f2f' : '#388e3c'};
+    background-color: ${props => props.$danger ? '#d32f2f' : '#388e3c'};
   }
   
   &:disabled {
@@ -125,28 +126,22 @@ function ActiveClassesTab() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  const getAuthConfig = () => {
-    try {
-      const adminAuth = JSON.parse(localStorage.getItem('adminAuth') || '{}');
-      return {
-        headers: {
-          'x-auth-token': adminAuth.token || ''
-        }
-      };
-    } catch (err) {
-      console.error('Error parsing auth token:', err);
-      return { headers: {} };
-    }
-  };
-  
   const fetchActiveSessions = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get('/api/admin/active-sessions', getAuthConfig());
+      const adminAuth = JSON.parse(localStorage.getItem('adminAuth') || '{}');
+      const config = {
+        headers: { 'x-auth-token': adminAuth.token || '' }
+      };
+      console.log('Auth config for request:', JSON.stringify(config));
+      
+      const response = await axios.get('/api/admin/active-sessions', config);
       setActiveSessions(response.data);
       setError(null);
     } catch (err) {
       console.error('Error fetching active sessions:', err);
+      console.error('Error details:', err.response?.data || 'No response data');
+      console.error('Status code:', err.response?.status);
       setError('현재 수업 목록을 불러오는 중 오류가 발생했습니다.');
     } finally {
       setIsLoading(false);
@@ -168,7 +163,10 @@ function ActiveClassesTab() {
     }
     
     try {
-      await axios.put(`/api/admin/active-sessions/${sessionId}/end`);
+      const adminAuth = JSON.parse(localStorage.getItem('adminAuth') || '{}');
+      await axios.put(`/api/admin/active-sessions/${sessionId}/end`, {}, {
+        headers: { 'x-auth-token': adminAuth.token || '' }
+      });
       // Remove ended session from local state to avoid waiting for next refresh
       setActiveSessions(prevSessions => 
         prevSessions.filter(session => session.id !== sessionId)
@@ -221,7 +219,7 @@ function ActiveClassesTab() {
                   session.participants.map(participant => (
                     <Participant key={participant.id}>
                       <span>{participant.student?.name || '알 수 없음'}</span>
-                      <Score value={participant.currentScore}>
+                      <Score $value={participant.currentScore}>
                         {participant.currentScore > 0 ? '+' : ''}{participant.currentScore}
                       </Score>
                     </Participant>
@@ -232,7 +230,7 @@ function ActiveClassesTab() {
               </ParticipantsList>
               
               <ActionButton 
-                danger 
+                $danger 
                 onClick={() => handleEndSession(session.id)}
               >
                 수업 강제 종료

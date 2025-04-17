@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect, useContext, useCallback } fr
 // teacherService import 는 유지
 import * as teacherService from '../services/teacherService';
 // adminService 등 필요 시 추가
+import * as adminService from '../services/adminService';
 
 const AuthContext = createContext();
 
@@ -14,7 +15,7 @@ const ADMIN_TOKEN_KEY = 'adminToken'; // 관리자용 토큰 키 (필요 시)
 export const AuthProvider = ({ children }) => {
   // 초기 상태는 로컬 스토리지의 토큰 존재 여부로 결정
   const [teacherAuth, setTeacherAuth] = useState(!!localStorage.getItem(TEACHER_TOKEN_KEY));
-  const [adminAuth, setAdminAuth] = useState(!!localStorage.getItem(ADMIN_TOKEN_KEY));
+  const [adminAuth, setAdminAuth] = useState(!!localStorage.getItem('adminAuth'));
   // 로딩 상태는 초기에 잠시 true였다가 토큰 확인 후 false로 변경
   const [loading, setLoading] = useState(true);
 
@@ -22,7 +23,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     // console.log('AuthProvider Mounted: Initial check for tokens.');
     setTeacherAuth(!!localStorage.getItem(TEACHER_TOKEN_KEY));
-    setAdminAuth(!!localStorage.getItem(ADMIN_TOKEN_KEY));
+    setAdminAuth(!!localStorage.getItem('adminAuth'));
     setLoading(false); // 토큰 확인 후 로딩 완료
   }, []);
 
@@ -79,32 +80,26 @@ export const AuthProvider = ({ children }) => {
 
   // --- 관리자 로그인/로그아웃 (JWT 방식으로 수정 필요 시 유사하게 변경) ---
   const adminLogin = async (password) => {
-    // TODO: 관리자 로그인 API 호출 및 토큰 처리 로직 구현
-    // try {
-    //   const responseData = await adminService.adminLogin(password);
-    //   if (responseData && responseData.token) {
-    //     localStorage.setItem(ADMIN_TOKEN_KEY, responseData.token);
-    //     setAdminAuth(true);
-    //     return true;
-    //   } else {
-    //     throw new Error('관리자 로그인 응답 형식이 올바르지 않습니다.');
-    //   }
-    // } catch (error) {
-    //   localStorage.removeItem(ADMIN_TOKEN_KEY);
-    //   setAdminAuth(false);
-    //   throw error;
-    // }
-    // 임시 Placeholder
-    console.warn("Admin login logic not implemented with JWT yet.");
-    localStorage.setItem('adminAuth', 'true'); // 임시 유지
-    setAdminAuth(true);
-    return true;
+    try {
+      // 관리자 로그인 API 호출 및 토큰 처리
+      const responseData = await adminService.adminLogin(password);
+      if (responseData && responseData.token) {
+        localStorage.setItem('adminAuth', responseData.token);
+        setAdminAuth(true);
+        return true;
+      } else {
+        throw new Error('관리자 로그인 응답 형식이 올바르지 않습니다.');
+      }
+    } catch (error) {
+      localStorage.removeItem('adminAuth');
+      setAdminAuth(false);
+      throw error;
+    }
   };
 
   const adminLogout = useCallback(() => {
-    // TODO: 관리자 토큰 제거 로직 구현
-    // localStorage.removeItem(ADMIN_TOKEN_KEY);
-    localStorage.removeItem('adminAuth'); // 임시 유지
+    // 관리자 토큰 제거
+    localStorage.removeItem('adminAuth');
     setAdminAuth(false);
   }, []);
   // --------------------------------------------------------------------
