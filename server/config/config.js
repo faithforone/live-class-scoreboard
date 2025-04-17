@@ -7,7 +7,7 @@
 
 module.exports = {
   development: {
-    username: process.env.DB_USERNAME || 'postgres', // .env 파일의 DB_USERNAME 또는 기본값
+    username: process.env.DB_USERNAME || 'sam', // .env 파일의 DB_USERNAME 또는 기본값
     password: process.env.DB_PASSWORD || null,      // .env 파일의 DB_PASSWORD 또는 기본값
     database: process.env.DB_DATABASE || 'live_class_scoreboard_dev', // .env 또는 기본값
     host: process.env.DB_HOST || '127.0.0.1',       // .env 또는 기본값

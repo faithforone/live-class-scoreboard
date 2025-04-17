@@ -1,6 +1,5 @@
 const express = require('express');
 const cors = require('cors');
-const dotenv = require('dotenv');
 const { sequelize } = require('./models');
 
 // 라우트 임포트
@@ -8,7 +7,6 @@ const adminRoutes = require('./routes/admin');
 const teacherRoutes = require('./routes/teacher');
 const viewerRoutes = require('./routes/viewer');
 
-dotenv.config();
 const app = express();
 
 // 미들웨어

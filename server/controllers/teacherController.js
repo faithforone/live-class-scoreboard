@@ -5,6 +5,7 @@
 const db = require('../models');
 const { Op } = require("sequelize"); // Sequelize 연산자
 const { v4: uuidv4 } = require('uuid'); // uuid 사용
+const jwt = require('jsonwebtoken');
 
 // --- 교사 로그인 처리 (JWT 토큰 생성 추가) ---
 exports.login = async (req, res) => {

@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const http = require('http');
 const app = require('./app');
 // sequelize 인스턴스만 가져옵니다. 모델은 필요시 각 파일에서 db 객체를 통해 가져옵니다.

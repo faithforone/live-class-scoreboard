@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 // teacherService import 는 유지
-import * *as* teacherService from '../services/teacherService';
+import * as teacherService from '../services/teacherService';
 // adminService 등 필요 시 추가
 
 const AuthContext = createContext();
