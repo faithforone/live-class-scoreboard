@@ -78,6 +78,23 @@ export const createClassSession = async (studentIds) => {
   }
 };
 
+/**
+ * 새로운 수업 세션을 시작합니다.
+ * @param {string[]} groupIds - 수업에 참여할 그룹 ID 배열
+ * @returns {Promise<object>} 생성된 세션 정보 (sessionId 포함)
+ */
+export const startClassSession = async (groupIds) => {
+  try {
+    // POST 요청으로 서버에 groupIds 배열을 전송
+    const response = await api.post('/teacher/sessions', { groupIds });
+    return response.data; // 서버에서 보낸 데이터 반환 ( { message, sessionId, session } )
+  } catch (error) {
+    console.error('Error starting class session:', error.response?.data || error.message);
+    // 오류 객체 또는 메시지를 그대로 throw하여 호출한 쪽에서 처리하도록 함
+    throw error.response?.data || new Error('Failed to start session');
+  }
+};
+
 // 수업 세션 종료
 export const endClassSession = async (sessionId) => {
   try {
