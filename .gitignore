@@ -1,0 +1,14 @@
+# macOS 시스템 파일
+.DS_Store
+*.AppleDouble
+
+# Windows 시스템 파일
+Thumbs.db
+ehthumbs.db
+
+# IDE 설정 폴더 (VS Code, IntelliJ 등)
+.vscode/
+.idea/
+
+# 일반 로그 파일
+*.log
