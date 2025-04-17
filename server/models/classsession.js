@@ -7,19 +7,19 @@ module.exports = (sequelize, DataTypes) => {
     static associate(models) {
       // 세션은 여러 참여자 기록을 가짐 (1:N)
       ClassSession.hasMany(models.SessionParticipant, {
-        foreignKey: 'session_id',      // SessionParticipant의 세션 ID 외래 키
+        foreignKey: 'sessionId',      // SessionParticipant의 세션 ID 외래 키 (camelCase로 변경)
         as: 'sessionParticipants'     // 관계 접근 시 사용할 별칭
       });
       // 세션은 여러 학생을 가질 수 있음 (N:M, SessionParticipant를 통해)
       ClassSession.belongsToMany(models.Student, {
         through: models.SessionParticipant, // 중간 모델 사용
-        foreignKey: 'session_id',          // SessionParticipant의 세션 ID 외래 키
-        otherKey: 'student_id',            // SessionParticipant의 학생 ID 외래 키
+        foreignKey: 'sessionId',          // SessionParticipant의 세션 ID 외래 키 (camelCase로 변경)
+        otherKey: 'studentId',            // SessionParticipant의 학생 ID 외래 키 (camelCase로 변경)
         as: 'students'                    // 관계 접근 시 사용할 별칭
       });
       // 현재 이 세션을 진행 중인 학생들 (1:N 관계, Student.currentSessionId)
       ClassSession.hasMany(models.Student, {
-        foreignKey: 'current_session_id', // Student 테이블의 외래 키
+        foreignKey: 'currentSessionId', // Student 테이블의 외래 키 (camelCase로 변경)
         as: 'currentStudents'         // 관계 접근 시 사용할 별칭
       });
       // 세션은 템플릿과 연결될 수 있음 (N:1 관계, optional)

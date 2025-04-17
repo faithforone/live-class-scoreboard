@@ -15,18 +15,18 @@ module.exports = (sequelize, DataTypes) => {
       // 학생은 여러 세션에 참여할 수 있음 (N:M, SessionParticipant를 통해)
       Student.belongsToMany(models.ClassSession, {
         through: models.SessionParticipant, // 중간 모델 사용
-        foreignKey: 'student_id',          // SessionParticipant의 학생 ID 외래 키
-        otherKey: 'session_id',            // SessionParticipant의 세션 ID 외래 키
+        foreignKey: 'studentId',          // SessionParticipant의 학생 ID 외래 키 (camelCase로 변경)
+        otherKey: 'sessionId',            // SessionParticipant의 세션 ID 외래 키 (camelCase로 변경)
         as: 'sessions'                    // 관계 접근 시 사용할 별칭
       });
       // 학생은 여러 세션 참여 기록(점수 등)을 가짐 (1:N)
       Student.hasMany(models.SessionParticipant, {
-        foreignKey: 'student_id',          // SessionParticipant의 학생 ID 외래 키
+        foreignKey: 'studentId',          // SessionParticipant의 학생 ID 외래 키 (camelCase로 변경)
         as: 'sessionParticipants'         // 관계 접근 시 사용할 별칭
       });
       // 학생은 현재 특정 세션에 속할 수 있음 (1:1 또는 1:N, Null 가능)
       Student.belongsTo(models.ClassSession, {
-        foreignKey: 'current_session_id', // 학생 테이블의 세션 ID 외래 키
+        foreignKey: 'currentSessionId', // 학생 테이블의 세션 ID 외래 키 (camelCase로 변경)
         as: 'currentSession',         // 관계 접근 시 사용할 별칭
         allowNull: true              // 현재 세션이 없을 수도 있음
       });
@@ -48,7 +48,7 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false, // 기본값을 가지므로 false 권장
       defaultValue: '대기중'
     },
-    current_session_id: { // Changed from camelCase to snake_case
+    currentSessionId: { // Changed from camelCase to snake_case, now changed back to camelCase
       type: DataTypes.INTEGER,
       allowNull: true, // 현재 세션이 없을 수 있음
       references: {

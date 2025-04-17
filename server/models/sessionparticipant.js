@@ -7,12 +7,12 @@ module.exports = (sequelize, DataTypes) => {
     static associate(models) {
       // 참여 기록은 특정 세션에 속함 (N:1)
       SessionParticipant.belongsTo(models.ClassSession, {
-        foreignKey: 'session_id', // 현재 모델의 외래 키 (snake_case)
+        foreignKey: 'sessionId', // snake_case에서 camelCase로 변경
         as: 'session'           // 관계 접근 시 사용할 별칭
       });
       // 참여 기록은 특정 학생에 속함 (N:1)
       SessionParticipant.belongsTo(models.Student, {
-        foreignKey: 'student_id', // 현재 모델의 외래 키 (snake_case)
+        foreignKey: 'studentId', // snake_case에서 camelCase로 변경
         as: 'student'           // 관계 접근 시 사용할 별칭
       });
       // 참여 기록은 여러 점수 로그를 가짐 (1:N)
@@ -30,7 +30,7 @@ module.exports = (sequelize, DataTypes) => {
       primaryKey: true,
       allowNull: false
     },
-    session_id: { // Changed from sessionId to session_id
+    sessionId: { // session_id에서 sessionId로 변경
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
@@ -39,7 +39,7 @@ module.exports = (sequelize, DataTypes) => {
       },
       onDelete: 'CASCADE' // 세션 삭제 시 참여 기록도 삭제
     },
-    student_id: { // Changed from studentId to student_id
+    studentId: { // student_id에서 studentId로 변경
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
@@ -64,7 +64,7 @@ module.exports = (sequelize, DataTypes) => {
     indexes: [
       {
         unique: true,
-        fields: ['session_id', 'student_id'] // Changed to snake_case
+        fields: ['sessionId', 'studentId'] // camelCase로 변경
       }
     ]
   });
