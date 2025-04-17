@@ -357,9 +357,14 @@ function StudentsTab() {
   };
   
   // Filter students based on search term
-  const filteredStudents = students.filter(student => 
-    student.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredStudents = searchTerm
+    ? students.filter(student => 
+        student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (student.groups && student.groups.some(group => 
+          group.name.toLowerCase().includes(searchTerm.toLowerCase())
+        ))
+      )
+    : students;
   
   if (isLoading && students.length === 0) {
     return <LoadingMessage>학생 목록을 불러오는 중...</LoadingMessage>;
@@ -403,9 +408,12 @@ function StudentsTab() {
                 <td>{student.id}</td>
                 <td>{student.name}</td>
                 <td>
-                  {student.groups?.map(group => (
-                    <GroupBadge key={group.id}>{group.name}</GroupBadge>
-                  ))}
+                  {student.groups && student.groups.length > 0 
+                    ? student.groups.map(group => (
+                        <GroupBadge key={group.id}>{group.name}</GroupBadge>
+                      ))
+                    : <span>소속 그룹 없음</span>
+                  }
                 </td>
                 <td>
                   <Badge $active={student.status === '수업중'}>
@@ -415,9 +423,14 @@ function StudentsTab() {
                 <td>{new Date(student.createdAt).toLocaleDateString()}</td>
                 <td>
                   <ActionButtons>
-                    <Button onClick={() => handleEditClick(student)}>수정</Button>
                     <Button 
-                      $danger 
+                      $primary
+                      onClick={() => handleEditClick(student)}
+                    >
+                      수정
+                    </Button>
+                    <Button 
+                      $danger
                       onClick={() => handleDeleteClick(student.id)}
                       disabled={student.status === '수업중'}
                     >

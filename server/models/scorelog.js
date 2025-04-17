@@ -43,7 +43,7 @@ module.exports = (sequelize, DataTypes) => {
     modelName: 'ScoreLog',
     tableName: 'score_logs', // 실제 테이블 이름
     timestamps: true, // createdAt, updatedAt 자동 관리
-    underscored: false // camelCase 사용
+    underscored: true // Use snake_case in the database
   });
   return ScoreLog;
 };

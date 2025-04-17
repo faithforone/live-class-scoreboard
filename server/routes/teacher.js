@@ -36,5 +36,8 @@ router.post('/score', teacherController.updateScore);
 // --- 히스토리 관련 라우트 ---
 router.get('/my-sessions', teacherController.getMySessionHistory);
 
+// --- 랭킹 관련 라우트 ---
+router.get('/rankings', teacherController.getStudentRankings);
+
 // 라우터 모듈을 export 합니다.
 module.exports = router;

@@ -52,34 +52,34 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       defaultValue: 'active'
     },
-    startTime: { // snake_case에서 camelCase로 변경
+    start_time: { // snake_case로 변경
       type: DataTypes.DATE,
       allowNull: false,
-      defaultValue: DataTypes.NOW // 생성 시 현재 시간 기본값
+      defaultValue: DataTypes.NOW
     },
-    endTime: { // snake_case에서 camelCase로 변경
+    end_time: { // snake_case로 변경
       type: DataTypes.DATE,
-      allowNull: true // 종료 시 설정
+      allowNull: true
     },
-    urlIdentifier: { // snake_case에서 camelCase로 변경
-      type: DataTypes.STRING, // UUID 등을 사용하므로 STRING
+    url_identifier: { // snake_case로 변경
+      type: DataTypes.STRING,
       allowNull: false,
       unique: true
     },
-    templateId: { // snake_case에서 camelCase로 변경
+    template_id: { // snake_case로 변경
       type: DataTypes.INTEGER,
-      allowNull: true, // 선택적 관계
+      allowNull: true,
       references: {
-        model: 'templates', // 참조 테이블
-        key: 'id'          // 참조 컬럼
+        model: 'templates',
+        key: 'id'
       }
     },
-    groupId: { // snake_case에서 camelCase로 변경
+    group_id: { // snake_case로 변경
       type: DataTypes.INTEGER,
-      allowNull: true, // 선택적 관계
+      allowNull: true,
       references: {
-        model: 'groups', // 참조 테이블
-        key: 'id'        // 참조 컬럼
+        model: 'groups',
+        key: 'id'
       }
     }
     // teacherId: { // 교사 연결 시 FK 추가 가능
@@ -90,9 +90,9 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     sequelize,
     modelName: 'ClassSession',
-    tableName: 'class_sessions', // 실제 테이블 이름
+    tableName: 'class_sessions',
     timestamps: true,
-    underscored: true  // This tells Sequelize to use snake_case in the DB
+    underscored: true
   });
   return ClassSession;
 };

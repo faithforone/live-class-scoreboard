@@ -199,18 +199,18 @@ function ActiveClassesTab() {
                   <strong>진행 시간:</strong> {formatDuration(new Date() - new Date(session.createdAt))}
                 </InfoRow>
                 <InfoRow>
-                  <strong>참가자 수:</strong> {session.participants?.length || 0}명
+                  <strong>참가자 수:</strong> {session.sessionParticipants?.length || 0}명
                 </InfoRow>
               </ClassInfo>
               
               <h4>참가자 목록</h4>
               <ParticipantsList>
-                {session.participants && session.participants.length > 0 ? (
-                  session.participants.map(participant => (
+                {session.sessionParticipants && session.sessionParticipants.length > 0 ? (
+                  session.sessionParticipants.map(participant => (
                     <Participant key={participant.id}>
                       <span>{participant.student?.name || '알 수 없음'}</span>
-                      <Score $value={participant.currentScore}>
-                        {participant.currentScore > 0 ? '+' : ''}{participant.currentScore}
+                      <Score $value={participant.score}>
+                        {participant.score > 0 ? '+' : ''}{participant.score}
                       </Score>
                     </Participant>
                   ))

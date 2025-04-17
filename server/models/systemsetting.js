@@ -32,7 +32,7 @@ module.exports = (sequelize, DataTypes) => {
     tableName: 'system_settings', // 실제 데이터베이스 테이블 이름 (보통 복수형, 스네이크 케이스)
     timestamps: true, // createdAt, updatedAt 자동 관리를 위해 true 권장
     // paranoid: true, // deletedAt 컬럼 (소프트 삭제) 사용 시 추가
-    underscored: false // camelCase의 createdAt, updatedAt 컬럼을 사용합니다.
+    underscored: true // Use snake_case in the database
   });
   return SystemSetting;
 };

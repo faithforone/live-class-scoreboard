@@ -7,33 +7,33 @@ module.exports = (sequelize, DataTypes) => {
     static associate(models) {
       // 학생은 여러 그룹에 속할 수 있음 (N:M)
       Student.belongsToMany(models.Group, {
-        through: models.StudentGroup, // 문자열 대신 모델 객체 사용
-        foreignKey: 'studentId', // 중간 테이블의 학생 ID 외래 키 (camelCase로 변경)
-        otherKey: 'groupId',     // 중간 테이블의 그룹 ID 외래 키 (camelCase로 변경)
-        as: 'groups'             // 관계 접근 시 사용할 별칭
+        through: models.StudentGroup,
+        foreignKey: 'student_id', // Use snake_case for foreign key
+        otherKey: 'group_id',     // Use snake_case for other key
+        as: 'groups'
       });
       // 학생은 여러 세션에 참여할 수 있음 (N:M, SessionParticipant를 통해)
       Student.belongsToMany(models.ClassSession, {
-        through: models.SessionParticipant, // 중간 모델 사용
-        foreignKey: 'studentId',          // SessionParticipant의 학생 ID 외래 키 (camelCase로 변경)
-        otherKey: 'sessionId',            // SessionParticipant의 세션 ID 외래 키 (camelCase로 변경)
-        as: 'sessions'                    // 관계 접근 시 사용할 별칭
+        through: models.SessionParticipant,
+        foreignKey: 'student_id',
+        otherKey: 'session_id',
+        as: 'sessions'
       });
       // 학생은 여러 세션 참여 기록(점수 등)을 가짐 (1:N)
       Student.hasMany(models.SessionParticipant, {
-        foreignKey: 'studentId',          // SessionParticipant의 학생 ID 외래 키 (camelCase로 변경)
-        as: 'sessionParticipants'         // 관계 접근 시 사용할 별칭
+        foreignKey: 'student_id',
+        as: 'sessionParticipants'
       });
       // 학생은 현재 특정 세션에 속할 수 있음 (1:1 또는 1:N, Null 가능)
       Student.belongsTo(models.ClassSession, {
-        foreignKey: 'currentSessionId', // 학생 테이블의 세션 ID 외래 키 (camelCase로 변경)
-        as: 'currentSession',         // 관계 접근 시 사용할 별칭
-        allowNull: true              // 현재 세션이 없을 수도 있음
+        foreignKey: 'currentSessionId',
+        as: 'currentSession',
+        allowNull: true
       });
     }
   }
   Student.init({
-    id: { // 마이그레이션에서 PK로 변경했으므로 정의 필요
+    id: {
       type: DataTypes.INTEGER,
       autoIncrement: true,
       primaryKey: true,
@@ -44,19 +44,19 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false
     },
     status: {
-      type: DataTypes.ENUM('대기중', '수업중'), // 컨트롤러 로직 기반 ENUM 사용
-      allowNull: false, // 기본값을 가지므로 false 권장
+      type: DataTypes.ENUM('대기중', '수업중'),
+      allowNull: false,
       defaultValue: '대기중'
     },
-    currentSessionId: { // Changed from camelCase to snake_case, now changed back to camelCase
+    currentSessionId: {
       type: DataTypes.INTEGER,
-      allowNull: true, // 현재 세션이 없을 수 있음
+      allowNull: true,
       references: {
-        model: 'class_sessions', // 참조할 테이블 이름 (ClassSession 모델의 tableName)
-        key: 'id'              // 참조할 컬럼 이름
+        model: 'class_sessions',
+        key: 'id'
       },
-      onUpdate: 'CASCADE', // 참조 무결성 옵션 (선택적)
-      onDelete: 'SET NULL' // 세션 삭제 시 학생의 currentSessionId를 NULL로 설정
+      onUpdate: 'CASCADE',
+      onDelete: 'SET NULL'
     }
     // createdAt, updatedAt 자동 관리 (timestamps: true 기본)
   }, {

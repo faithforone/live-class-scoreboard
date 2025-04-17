@@ -1,5 +1,5 @@
 // React와 필요한 훅(hook)들을 가져옵니다.
-import React, { useState } from 'react'; // useState: 컴포넌트 내부의 상태(값)를 관리
+import React, { useState, useEffect } from 'react'; // useState: 컴포넌트 내부의 상태(값)를 관리
 import { useNavigate } from 'react-router-dom'; // useNavigate: 페이지 이동 기능 제공
 import { useAuth } from '../../contexts/AuthContext'; // useAuth: 우리가 만든 인증 관련 Context 사용
 
@@ -16,9 +16,29 @@ function TeacherLoginPage() {
 
   // --- 훅(Hook) 사용 ---
   // AuthContext에서 제공하는 기능 중 teacherLogin 함수를 가져옵니다.
-  const { teacherLogin } = useAuth();
+  const { teacherLogin, teacherAuth } = useAuth();
   // react-router-dom에서 제공하는 페이지 이동 함수를 가져옵니다.
   const navigate = useNavigate();
+  
+  // DEBUG: 로그인 상태와 토큰 모니터링
+  useEffect(() => {
+    // 컴포넌트 마운트 시 로컬 스토리지 확인
+    const token = localStorage.getItem('teacherToken');
+    console.log('TeacherLoginPage mounted - Auth state:', teacherAuth);
+    console.log('TeacherLoginPage mounted - Token exists:', !!token);
+    
+    // 토큰 검사 타이머 설정 (5초마다)
+    const timer = setInterval(() => {
+      const currentToken = localStorage.getItem('teacherToken');
+      console.log('Token check - exists:', !!currentToken);
+      if (currentToken) {
+        console.log('Token preview:', currentToken.substring(0, 20) + '...');
+      }
+    }, 5000);
+    
+    // 컴포넌트 언마운트 시 타이머 정리
+    return () => clearInterval(timer);
+  }, [teacherAuth]);
 
   // --- 이벤트 핸들러 함수 ---
   // 사용자가 로그인 버튼을 클릭하거나 폼을 제출했을 때 실행될 함수
@@ -42,6 +62,13 @@ function TeacherLoginPage() {
       // teacherLogin 함수는 성공 시 resolve된 Promise를, 실패 시 reject된 Promise(오류)를 반환합니다.
       console.log('TeacherLoginPage: 로그인 시도...'); // 개발 확인용 로그
       await teacherLogin(password);
+
+      // DEBUG: 로그인 직후 토큰 확인
+      const token = localStorage.getItem('teacherToken');
+      console.log('Login successful - token exists:', !!token);
+      if (token) {
+        console.log('Token preview:', token.substring(0, 20) + '...');
+      }
 
       // teacherLogin 함수가 성공적으로 완료되면 (오류가 발생하지 않으면) 이 코드가 실행됩니다.
       console.log('TeacherLoginPage: 로그인 성공, 페이지 이동...'); // 개발 확인용 로그

@@ -31,20 +31,13 @@ module.exports = (sequelize, DataTypes) => {
         key: 'id'
       },
       onDelete: 'CASCADE'
-    },
-    createdAt: {
-      type: DataTypes.DATE,
-      allowNull: false
-    },
-    updatedAt: {
-      type: DataTypes.DATE,
-      allowNull: false
     }
   }, {
     sequelize,
     modelName: 'TemplateGroup',
     tableName: 'template_groups',
-    underscored: false
+    underscored: true,
+    timestamps: true
   });
   
   return TemplateGroup;

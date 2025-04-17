@@ -28,7 +28,7 @@ exports.verifyTeacherToken = (req, res, next) => {
     jwt.verify(token, jwtSecret, (err, decoded) => {
       // err 객체로 유효성 검사 실패 또는 만료 여부 확인
       if (err) {
-        // console.log('Token verification failed:', err.name, err.message); // 디버깅 로그
+        console.log('Token verification failed:', err.name, err.message); // 디버깅 로그 활성화
         if (err.name === 'TokenExpiredError') {
              // 토큰 만료 시 클라이언트가 재로그인하거나 토큰 갱신 로직 필요
              return res.status(401).json({ message: '인증 토큰이 만료되었습니다.', code: 'TOKEN_EXPIRED' });
@@ -40,12 +40,14 @@ exports.verifyTeacherToken = (req, res, next) => {
       // 3. 토큰이 유효한 경우, decoded 된 정보(payload)를 req 객체에 추가
       //    - 토큰 생성 시 넣은 정보를 여기서 사용할 수 있습니다.
       //    - 예: payload 에 { role: 'teacher' } 가 포함되어 있는지 확인
+      console.log('Token decoded payload:', JSON.stringify(decoded)); // 디코딩된 페이로드 출력
+      
       if (decoded.role !== 'teacher') {
-           // console.log('Token verification: Role mismatch.', decoded.role); // 디버깅 로그
+           console.log('Token verification: Role mismatch. Found role:', decoded.role); // 디버깅 로그 활성화
            return res.status(403).json({ message: '접근 권한이 없습니다 (교사 역할 아님).', code: 'INSUFFICIENT_ROLE' }); // 403 Forbidden
       }
 
-      // console.log('Token verified successfully. Attaching user:', decoded); // 디버깅 로그
+      console.log('Token verified successfully. User role: teacher'); // 디버깅 로그 활성화
       // req.user 에 디코딩된 페이로드 전체 또는 필요한 정보 저장
       // 이후 라우트 핸들러에서 req.user 를 통해 인증된 사용자 정보 접근 가능
       req.user = decoded;

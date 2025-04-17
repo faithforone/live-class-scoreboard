@@ -1,0 +1,230 @@
+/* ActiveClass.css */
+.active-class-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.class-header {
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.class-header h1 {
+  margin-bottom: 10px;
+  color: #333;
+}
+
+.session-info {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.class-actions {
+  margin-bottom: 25px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.end-session-btn {
+  background-color: #d9534f;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.end-session-btn:hover {
+  background-color: #c9302c;
+}
+
+.end-session-btn:disabled {
+  background-color: #f4bcbc;
+  cursor: not-allowed;
+}
+
+.students-container {
+  margin-bottom: 30px;
+}
+
+.students-container h2 {
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.students-table {
+  width: 100%;
+  border-collapse: collapse;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.students-table th,
+.students-table td {
+  padding: 12px 15px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+
+.students-table th {
+  background-color: #f8f8f8;
+  font-weight: bold;
+}
+
+.students-table tr:hover {
+  background-color: #f5f5f5;
+}
+
+.score {
+  font-weight: bold;
+  text-align: center;
+}
+
+.points-input {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.quick-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+  margin-bottom: 5px;
+}
+
+.manual-adjust {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.quick-btn {
+  width: 34px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  border: 1px solid #ddd;
+}
+
+.quick-btn.minus {
+  background-color: #ffebee;
+  color: #d32f2f;
+}
+
+.quick-btn.minus:hover {
+  background-color: #ffcdd2;
+}
+
+.quick-btn.plus {
+  background-color: #e8f5e9;
+  color: #388e3c;
+}
+
+.quick-btn.plus:hover {
+  background-color: #c8e6c9;
+}
+
+.points-input input {
+  width: 60px;
+  text-align: center;
+  margin: 0 5px;
+  padding: 5px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.point-btn {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.point-btn.minus {
+  color: #d9534f;
+}
+
+.point-btn.plus {
+  color: #5cb85c;
+}
+
+.award-btn {
+  background-color: #5cb85c;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.award-btn:hover {
+  background-color: #4cae4c;
+}
+
+.award-btn:disabled {
+  background-color: #a3d7a3;
+  cursor: not-allowed;
+}
+
+.feed-info {
+  background-color: #f9f9f9;
+  padding: 15px;
+  border-radius: 4px;
+  margin-top: 20px;
+}
+
+.feed-info h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #333;
+}
+
+.feed-info a {
+  color: #337ab7;
+  text-decoration: none;
+}
+
+.feed-info a:hover {
+  text-decoration: underline;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  font-size: 1.2rem;
+  color: #666;
+}
+
+.error-message {
+  color: #d9534f;
+  padding: 20px;
+  text-align: center;
+  border: 1px solid #d9534f;
+  border-radius: 4px;
+  margin: 20px 0;
+}
+
+.no-session {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+  font-size: 1.2rem;
+} 

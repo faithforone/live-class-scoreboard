@@ -17,9 +17,15 @@ const api = axios.create({
 // API 요청을 보내기 전에 헤더에 토큰 추가
 api.interceptors.request.use(
   (config) => {
+    // DEBUG: 모든 요청 URL 로깅
+    console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`);
+    
     // 로컬 스토리지에서 토큰 가져오기
     const teacherToken = localStorage.getItem(TEACHER_TOKEN_KEY);
     const adminAuthItem = localStorage.getItem(ADMIN_TOKEN_KEY);
+    
+    // DEBUG: 토큰 존재 여부 로깅
+    console.log('Tokens in localStorage - Teacher:', !!teacherToken, 'Admin:', !!adminAuthItem);
     
     // 관리자 토큰 추출 (adminAuth는 JSON 형태로 저장됨)
     let adminToken = null;
@@ -38,6 +44,9 @@ api.interceptors.request.use(
     if (token) {
       // 토큰이 있으면 Authorization 헤더 추가
       config.headers['Authorization'] = `Bearer ${token}`;
+      
+      // DEBUG: 디버깅을 위해 토큰의 일부 출력
+      console.log('Interceptor: Token added to headers. Token preview:', token.substring(0, 20) + '...');
       
       // 관리자 토큰의 경우 x-auth-token 헤더도 추가 (기존 코드와의 호환성)
       if (adminToken) {
@@ -60,10 +69,22 @@ api.interceptors.request.use(
 // --- 응답 인터셉터 (Response Interceptor) - 선택 사항 (401 오류 처리 등) ---
 api.interceptors.response.use(
   (response) => {
+    // DEBUG: 응답 결과 로깅
+    console.log(`API Response (${response.status}): ${response.config.method?.toUpperCase()} ${response.config.url}`);
+    console.log('Response data:', response.data);
+    
     // 2xx 범위의 상태 코드 - 응답 데이터 그대로 반환
     return response;
   },
   (error) => {
+    // DEBUG: 에러 응답 자세히 로깅
+    console.error('API Error Response:', {
+      url: error.config?.url,
+      method: error.config?.method?.toUpperCase(),
+      status: error.response?.status,
+      data: error.response?.data
+    });
+
     // 2xx 외의 상태 코드 - 오류 처리
     console.error('API Response Interceptor Error:', error.response || error.message);
 

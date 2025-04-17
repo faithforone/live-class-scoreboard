@@ -327,6 +327,37 @@ function GroupsTab() {
     return <LoadingMessage>그룹 목록을 불러오는 중...</LoadingMessage>;
   }
   
+  const renderGroupRows = () => {
+    return groups.map(group => (
+      <tr key={group.id}>
+        <td>{group.name}</td>
+        <td>
+          {group.students && group.students.length > 0 
+            ? group.students.map(student => <Badge key={student.id}>{student.name}</Badge>)
+            : <span>학생 없음</span>
+          }
+        </td>
+        <td>{new Date(group.createdAt).toLocaleDateString()}</td>
+        <td>
+          <ActionButtons>
+            <Button 
+              $primary
+              onClick={() => handleEditClick(group)}
+            >
+              수정
+            </Button>
+            <Button 
+              $danger
+              onClick={() => handleDeleteClick(group.id)}
+            >
+              삭제
+            </Button>
+          </ActionButtons>
+        </td>
+      </tr>
+    ));
+  };
+  
   return (
     <Container>
       <Title>그룹 관리</Title>
@@ -352,28 +383,7 @@ function GroupsTab() {
             </tr>
           </TableHead>
           <TableBody>
-            {groups.map(group => (
-              <tr key={group.id}>
-                <td>{group.id}</td>
-                <td>{group.name}</td>
-                <td>
-                  <Badge>{group.students ? group.students.length : 0}명</Badge>
-                </td>
-                <td>{new Date(group.createdAt).toLocaleDateString()}</td>
-                <td>
-                  <ActionButtons>
-                    <Button onClick={() => handleEditClick(group)}>수정</Button>
-                    <Button 
-                      $danger 
-                      onClick={() => handleDeleteClick(group.id)}
-                      disabled={group.students && group.students.length > 0}
-                    >
-                      삭제
-                    </Button>
-                  </ActionButtons>
-                </td>
-              </tr>
-            ))}
+            {renderGroupRows()}
           </TableBody>
         </Table>
       )}

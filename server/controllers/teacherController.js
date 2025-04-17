@@ -44,6 +44,8 @@ exports.login = async (req, res) => {
         role: 'teacher' // 역할 정보 포함 (verifyTeacherToken 미들웨어에서 사용)
       };
 
+      console.log('Login - Creating token with payload:', JSON.stringify(payload));
+      
       // 토큰 옵션 (만료 시간 등)
       const options = {
         expiresIn: process.env.JWT_EXPIRES_IN || '8h' // 예: 8시간 (환경 변수로 설정 가능)
@@ -51,6 +53,8 @@ exports.login = async (req, res) => {
 
       // 토큰 서명 (생성)
       const token = jwt.sign(payload, jwtSecret, options);
+      
+      console.log('Login - Token created successfully');
 
       // 4. 생성된 토큰과 함께 성공 응답 전송
       res.status(200).json({
@@ -249,8 +253,8 @@ exports.createClassSession = async (req, res) => {
             // name: sessionName || `Session - ${new Date().toISOString()}`, // 세션 이름 설정
             name: sessionName || null, // 이름 없으면 null
             status: 'active',       // 'active' 상태로 시작
-            startTime: new Date(),
-            urlIdentifier: urlIdentifier // 고유 식별자 저장
+            start_time: new Date(), // snake_case로 수정 (모델에 맞춤)
+            url_identifier: urlIdentifier // snake_case로 수정 (모델에 맞춤)
             // teacherId: teacherId, // 실제 교사 ID 연결 시
         }, { transaction: t });
         const sessionId = newSession.id;
@@ -371,7 +375,7 @@ exports.getMyActiveSession = async (req, res) => {
         // createdBy: teacherIdentifier // 이 필드가 모델에 있고, IP 기반 식별이 맞다면 사용
         // teacherId: teacherId // 실제 교사 ID 필터링 시
       },
-      order: [['startTime', 'DESC']], // 가장 최근 세션
+      order: [['start_time', 'DESC']], // 스네이크 케이스로 수정 - 데이터베이스 컬럼명과 일치
       include: [{
         model: db.SessionParticipant, // 참여자 정보 포함
         as: 'sessionParticipants',     // index.js 관계 설정 'as' 확인
@@ -524,7 +528,7 @@ exports.getMySessionHistory = async (req, res) => {
       // where: { teacherId: teacherId }, // 교사 ID 필터링 시
       limit: parseInt(limit, 10),
       offset: offset,
-      order: [['startTime', 'DESC']], // classSession.js 필드 'startTime' 확인
+      order: [['start_time', 'DESC']], // 스네이크 케이스로 수정 - 데이터베이스 컬럼명과 일치
       include: [{
           model: db.SessionParticipant, // 중간 테이블을 통해 학생 정보 로드
           as: 'sessionParticipants',      // index.js 관계 설정 'as' 확인
@@ -562,5 +566,79 @@ exports.getMySessionHistory = async (req, res) => {
   } catch (error) {
     console.error('Error fetching session history:', error.stack || error);
     res.status(500).json({ message: '수업 히스토리 조회 중 오류가 발생했습니다.' });
+  }
+};
+
+// --- 랭킹 관련 ---
+
+// 학생 랭킹 조회
+exports.getStudentRankings = async (req, res) => {
+  const { period = 'all' } = req.query;
+  console.log(`teacherController: getStudentRankings triggered, period: ${period}`);
+  
+  try {
+    let whereCondition = {}; // 기간 필터링을 위한 조건
+    const currentDate = new Date();
+    
+    // 기간에 따른 조건 설정
+    if (period === 'today') {
+      const startOfDay = new Date(currentDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      
+      whereCondition = {
+        timestamp: {
+          [db.Sequelize.Op.gte]: startOfDay
+        }
+      };
+    } else if (period === 'week') {
+      const startOfWeek = new Date(currentDate);
+      startOfWeek.setDate(currentDate.getDate() - currentDate.getDay()); // 이번 주 일요일로 설정
+      startOfWeek.setHours(0, 0, 0, 0);
+      
+      whereCondition = {
+        timestamp: {
+          [db.Sequelize.Op.gte]: startOfWeek
+        }
+      };
+    } else if (period === 'month') {
+      const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      startOfMonth.setHours(0, 0, 0, 0);
+      
+      whereCondition = {
+        timestamp: {
+          [db.Sequelize.Op.gte]: startOfMonth
+        }
+      };
+    }
+    
+    // 학생 별 총점 계산을 위한 쿼리
+    const studentRankings = await db.sequelize.query(`
+      SELECT 
+        s.id, 
+        s.name, 
+        COALESCE(SUM(sp.score), 0) as totalScore 
+      FROM 
+        students s
+      LEFT JOIN 
+        session_participants sp ON s.id = sp.student_id
+      LEFT JOIN
+        class_sessions cs ON sp.session_id = cs.id
+      ${Object.keys(whereCondition).length > 0 ? 
+        `WHERE cs.start_time >= :startDate` : ''}
+      GROUP BY 
+        s.id, s.name
+      ORDER BY 
+        totalScore DESC, s.name ASC
+    `, {
+      replacements: Object.keys(whereCondition).length > 0 ? 
+        { startDate: whereCondition.timestamp[db.Sequelize.Op.gte] } : {},
+      type: db.sequelize.QueryTypes.SELECT
+    });
+    
+    console.log(`teacherController: Found ${studentRankings.length} students for ranking`);
+    res.status(200).json(studentRankings);
+  } catch (error) {
+    console.error('Error fetching student rankings:', error.stack || error);
+    res.status(500).json({ message: '학생 랭킹 조회 중 오류가 발생했습니다.' });
   }
 };

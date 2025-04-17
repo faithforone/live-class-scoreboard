@@ -143,8 +143,8 @@ function ClassPreparation() {
       if (responseData && responseData.session && responseData.session.id) {
           const sessionId = responseData.session.id;
           // 네비게이션 경로 확인 필요 (App.js 라우팅 설정 기준)
-          // 예: /class/:sessionId 형태
-          navigate(`/class/${sessionId}`); // <<< 경로 및 ID 접근 수정됨!
+          // 경로를 '/teacher/class/:sessionId'로 수정
+          navigate(`/teacher/class/${sessionId}`);
       } else {
           // 응답은 성공했으나 예상한 데이터 구조가 아닐 경우
           console.error('Could not find session ID in response:', responseData);

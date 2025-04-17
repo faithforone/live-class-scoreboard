@@ -14,6 +14,8 @@ export const teacherLogin = async (password) => {
     // JWT 토큰을 반환하도록 수정되어야 합니다.
     // 예: response.data = { token: '...', message: '...' }
     console.log('teacherService: 로그인 API 호출 성공', response.data);
+    // DEBUG: 로그인 응답 검사
+    console.log('Raw login response:', JSON.stringify(response.data));
 
     // 로그인 성공 후 토큰 저장 로직은 이 함수를 호출하는 AuthContext.js 등에서 처리
     // 예: if (response.data.token) localStorage.setItem('teacherToken', response.data.token);
@@ -181,5 +183,16 @@ export const getMySessionHistory = async (page = 1, limit = 10) => {
   } catch (error) {
     console.error('Error fetching session history:', error.response?.data || error.message);
     throw error.response?.data || new Error('수업 히스토리 조회 중 오류 발생');
+  }
+};
+
+// 학생 랭킹 조회
+export const getStudentRankings = async (period = 'all') => {
+  try {
+    const response = await api.get(`/teacher/rankings?period=${period}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching student rankings:', error.response?.data || error.message);
+    throw error.response?.data || new Error('랭킹 데이터 조회 중 오류 발생');
   }
 };

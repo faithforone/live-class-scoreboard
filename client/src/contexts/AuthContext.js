@@ -34,11 +34,18 @@ export const AuthProvider = ({ children }) => {
       // teacherService.teacherLogin 은 성공 시 { message: '...', token: '...' } 형태의 객체를 반환할 것으로 기대
       const responseData = await teacherService.teacherLogin(password);
 
+      // 디버그: 응답 데이터 검사
+      console.log('Login response received:', JSON.stringify(responseData));
+
       // 응답 데이터와 토큰 존재 여부 확인
       if (responseData && responseData.token) {
         console.log('AuthContext: 로그인 성공! 토큰 수신 및 저장');
         // 1. 로컬 스토리지에 JWT 토큰 저장
         localStorage.setItem(TEACHER_TOKEN_KEY, responseData.token);
+        
+        // 디버그: 토큰 저장 확인
+        console.log('Token saved to localStorage:', localStorage.getItem(TEACHER_TOKEN_KEY)?.substring(0, 20) + '...');
+
         // 2. (매우 중요) 비밀번호는 절대 저장하지 않습니다! 아래 라인 제거.
         // localStorage.removeItem('teacherPassword'); // 혹시 남아있을 수 있으니 한번 더 제거
         // 3. React 상태 업데이트

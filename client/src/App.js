@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 // 페이지 컴포넌트 import
 import AdminLoginPage from './pages/AdminPage/AdminLoginPage';
@@ -11,14 +11,23 @@ import ActiveClass from './pages/ClassPage/ActiveClass';
 import FeedPage from './pages/FeedPage/FeedPage';
 import WidgetPage from './pages/FeedPage/WidgetPage';
 import RankingPage from './pages/RankingPage/RankingPage';
+import ScorePopup from './pages/FeedPage/ScorePopup';
 
 // 권한 체크 래퍼 컴포넌트
 const ProtectedRoute = ({ children, role }) => {
   // 여기서 로그인 상태와 권한 확인
-  const isAuthenticated = localStorage.getItem(role === 'admin' ? 'adminAuth' : 'teacherAuth');
+  // 올바른 방법으로 localStorage 체크
+  const TEACHER_TOKEN_KEY = 'teacherToken';
+  const ADMIN_TOKEN_KEY = 'adminAuth';
+  const isAuthenticated = role === 'admin' 
+    ? !!localStorage.getItem(ADMIN_TOKEN_KEY) 
+    : !!localStorage.getItem(TEACHER_TOKEN_KEY);
+  
+  console.log(`Protected route (${role}) - Authentication check:`, isAuthenticated);
   
   if (!isAuthenticated) {
     // 로그인되지 않은 경우 해당 로그인 페이지로 리디렉션
+    console.log(`Redirecting to ${role === 'admin' ? '/admin/login' : '/teacher/login'}`);
     return <Navigate to={role === 'admin' ? '/admin/login' : '/teacher/login'} replace />;
   }
   
@@ -56,6 +65,7 @@ function App() {
           <Route path="/feed/:urlIdentifier" element={<FeedPage />} />
           <Route path="/widget/:urlIdentifier" element={<WidgetPage />} />
           <Route path="/rankings" element={<RankingPage />} />
+          <Route path="/popup/:feedId" element={<ScorePopup />} />
 
           {/* 기본 경로 리디렉션 */}
           <Route path="/" element={<Navigate to="/teacher/login" replace />} />

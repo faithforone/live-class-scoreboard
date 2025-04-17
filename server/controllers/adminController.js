@@ -1,4 +1,4 @@
-const { Student, Group, ClassSession, ScoreLog, SystemSetting, sequelize, StudentGroup, Template } = require('../models');
+const { Student, Group, ClassSession, ScoreLog, SystemSetting, sequelize, StudentGroup, Template, SessionParticipant } = require('../models');
 const bcrypt = require('bcrypt');
 
 // 학생 목록 조회 (전체)
@@ -465,6 +465,15 @@ exports.getActiveSessions = async (req, res) => {
       },
       include: [
         {
+          model: SessionParticipant,
+          as: 'sessionParticipants',
+          include: [{
+            model: Student,
+            as: 'student',
+            attributes: ['id', 'name']
+          }]
+        },
+        {
           model: Student,
           as: 'currentStudents',
           required: false
@@ -478,7 +487,7 @@ exports.getActiveSessions = async (req, res) => {
           as: 'group'
         }
       ],
-      order: [['startTime', 'DESC']]
+      order: [['start_time', 'DESC']]
     });
 
     res.status(200).json(activeSessions);
