@@ -5,11 +5,11 @@ const bcrypt = require('bcrypt');
 exports.getAllStudents = async (req, res) => {
   try {
     const students = await Student.findAll({
-      attributes: ['id', 'name', 'status', ['current_session_id', 'currentSessionId'], ['created_at', 'createdAt'], ['updated_at', 'updatedAt']],
+      attributes: ['id', 'name', 'status', 'currentSessionId', 'createdAt', 'updatedAt'],
       include: [{
         model: Group,
         as: 'groups',
-        attributes: ['id', 'name', ['created_at', 'createdAt'], ['updated_at', 'updatedAt']],
+        attributes: ['id', 'name', 'createdAt', 'updatedAt'],
         through: { attributes: [] } // 중간 테이블 속성 제외
       }],
       order: [['name', 'ASC']]
@@ -174,7 +174,7 @@ exports.deleteStudent = async (req, res) => {
 exports.getAllGroups = async (req, res) => {
   try {
     const groups = await Group.findAll({
-      attributes: ['id', 'name', ['created_at', 'createdAt'], ['updated_at', 'updatedAt']],
+      attributes: ['id', 'name', 'createdAt', 'updatedAt'],
       include: [
         {
           model: Student,
@@ -466,7 +466,8 @@ exports.getActiveSessions = async (req, res) => {
       include: [
         {
           model: Student,
-          as: 'currentStudents'
+          as: 'currentStudents',
+          required: false
         },
         {
           model: Template,

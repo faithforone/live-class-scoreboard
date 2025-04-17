@@ -9,7 +9,7 @@ const { Template, Group } = require('../models');
 const getAllTemplates = async (req, res) => {
   try {
     const templates = await Template.findAll({
-      attributes: ['id', 'name', 'description', 'metrics', ['is_active', 'isActive'], ['created_at', 'createdAt'], ['updated_at', 'updatedAt']],
+      attributes: ['id', 'name', 'description', 'metrics', 'isActive', 'createdAt', 'updatedAt'],
       include: [{ 
         model: Group, 
         as: 'groups', 
@@ -32,7 +32,7 @@ const getAllTemplates = async (req, res) => {
 const getTemplateById = async (req, res) => {
   try {
     const template = await Template.findByPk(req.params.id, {
-      attributes: ['id', 'name', 'description', 'metrics', ['is_active', 'isActive'], ['created_at', 'createdAt'], ['updated_at', 'updatedAt']],
+      attributes: ['id', 'name', 'description', 'metrics', 'isActive', 'createdAt', 'updatedAt'],
       include: [{ 
         model: Group, 
         as: 'groups', 
@@ -144,7 +144,7 @@ const deleteTemplate = async (req, res) => {
 const getTemplateGroups = async (req, res) => {
   try {
     const template = await Template.findByPk(req.params.id, {
-      attributes: ['id', 'name', 'description', 'metrics', ['is_active', 'isActive'], ['created_at', 'createdAt'], ['updated_at', 'updatedAt']],
+      attributes: ['id', 'name', 'description', 'metrics', 'isActive', 'createdAt', 'updatedAt'],
       include: [{ 
         model: Group, 
         as: 'groups', 
@@ -190,7 +190,7 @@ const addGroupToTemplate = async (req, res) => {
     
     // Get the updated template with all groups
     const updatedTemplate = await Template.findByPk(req.params.id, {
-      attributes: ['id', 'name', 'description', 'metrics', ['is_active', 'isActive'], ['created_at', 'createdAt'], ['updated_at', 'updatedAt']],
+      attributes: ['id', 'name', 'description', 'metrics', 'isActive', 'createdAt', 'updatedAt'],
       include: [{ 
         model: Group, 
         as: 'groups', 
