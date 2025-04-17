@@ -7,17 +7,17 @@ module.exports = (sequelize, DataTypes) => {
     static associate(models) {
       // 그룹은 여러 학생을 가질 수 있음 (N:M)
       Group.belongsToMany(models.Student, {
-        through: 'StudentGroup', // 중간 테이블 이름 (Student 모델과 동일하게 지정)
-        foreignKey: 'groupId',     // 중간 테이블의 그룹 ID 외래 키
-        otherKey: 'studentId',   // 중간 테이블의 학생 ID 외래 키
+        through: 'student_groups', // 중간 테이블 이름 (snake_case로 변경)
+        foreignKey: 'group_id',     // 중간 테이블의 그룹 ID 외래 키
+        otherKey: 'student_id',   // 중간 테이블의 학생 ID 외래 키
         as: 'students'           // 관계 접근 시 사용할 별칭 (컨트롤러 로직과 일치)
       });
 
       // 그룹은 여러 템플릿에 속할 수 있음 (N:M)
       Group.belongsToMany(models.Template, {
         through: 'template_groups',
-        foreignKey: 'groupId',
-        otherKey: 'templateId',
+        foreignKey: 'group_id',
+        otherKey: 'template_id',
         as: 'templates'
       });
     }
@@ -39,7 +39,8 @@ module.exports = (sequelize, DataTypes) => {
     sequelize,
     modelName: 'Group',
     tableName: 'groups',
-    timestamps: true // createdAt, updatedAt 자동 관리
+    timestamps: true, // createdAt, updatedAt 자동 관리
+    underscored: true // 모델 필드 이름을 스네이크 케이스로 자동 변환
   });
   return Group;
 };

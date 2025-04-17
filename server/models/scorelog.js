@@ -7,7 +7,7 @@ module.exports = (sequelize, DataTypes) => {
     static associate(models) {
       // 점수 로그는 특정 세션 참여 기록에 속함 (N:1)
       ScoreLog.belongsTo(models.SessionParticipant, {
-        foreignKey: 'participantId', // 현재 모델의 외래 키
+        foreignKey: 'participant_id', // 현재 모델의 외래 키
         as: 'participant'           // 관계 접근 시 사용할 별칭
       });
     }
@@ -19,7 +19,7 @@ module.exports = (sequelize, DataTypes) => {
       primaryKey: true,
       allowNull: false
     },
-    participantId: { // SessionParticipant FK
+    participant_id: { // SessionParticipant FK
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
@@ -42,7 +42,8 @@ module.exports = (sequelize, DataTypes) => {
     sequelize,
     modelName: 'ScoreLog',
     tableName: 'score_logs', // 실제 테이블 이름
-    timestamps: true // createdAt, updatedAt 자동 관리
+    timestamps: true, // createdAt, updatedAt 자동 관리
+    underscored: true // 모델 필드 이름을 스네이크 케이스로 자동 변환
   });
   return ScoreLog;
 };
