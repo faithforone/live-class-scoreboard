@@ -174,6 +174,7 @@ exports.deleteStudent = async (req, res) => {
 exports.getAllGroups = async (req, res) => {
   try {
     const groups = await Group.findAll({
+      attributes: ['id', 'name', 'created_at', 'updated_at'], // Use snake_case column names after migration
       include: [
         {
           model: Student,
@@ -464,7 +465,7 @@ exports.getActiveSessions = async (req, res) => {
           as: 'group'
         }
       ],
-      order: [['start_time', 'DESC']]  // Fixed column name to use snake_case
+      order: [['start_time', 'DESC']]  // Changed back to snake_case
     });
 
     res.status(200).json(activeSessions);
@@ -500,7 +501,7 @@ exports.forceEndSession = async (req, res) => {
     await session.update(
       { 
         status: '종료됨',
-        end_time: new Date()
+        end_time: new Date()  // Changed back to snake_case
       },
       { transaction: t }
     );
@@ -509,10 +510,10 @@ exports.forceEndSession = async (req, res) => {
     await Student.update(
       { 
         status: '대기중',
-        current_session_id: null
+        current_session_id: null  // Changed back to snake_case
       },
       { 
-        where: { current_session_id: session_id },
+        where: { current_session_id: session_id },  // Changed back to snake_case
         transaction: t
       }
     );
@@ -537,7 +538,7 @@ exports.getCompletedSessions = async (req, res) => {
       where: { status: '종료됨' },
       limit: parseInt(limit),
       offset: parseInt(offset),
-      order: [['end_time', 'DESC']]  // Fixed column name to use snake_case
+      order: [['end_time', 'DESC']]  // Changed back to snake_case
     });
     
     res.status(200).json({
@@ -561,7 +562,7 @@ exports.getSessionScoreLogs = async (req, res) => {
     const { session_id } = req.params;
     
     const scoreLogs = await ScoreLog.findAll({
-      where: { session_id: session_id },
+      where: { session_id: session_id },  // Changed back to snake_case
       include: [
         {
           model: Student,
@@ -595,7 +596,7 @@ exports.resetScores = async (req, res) => {
     
     // 특정 학생들만 초기화
     if (studentIds && studentIds.length > 0) {
-      whereClause.student_id = studentIds;
+      whereClause.student_id = studentIds;  // Changed back to snake_case
     }
     
     // 특정 기간 초기화

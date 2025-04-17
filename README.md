@@ -100,6 +100,42 @@ live-class-scoreboard/
 │   └── utils/              # 유틸리티 함수
 ```
 
+## 데이터베이스 명명 규칙 (DB Naming Conventions)
+
+### 중요: 이 프로젝트는 데이터베이스 필드에 snake_case를 사용합니다.
+
+1. **테이블 이름**: 복수형, snake_case (`students`, `class_sessions`, `score_logs`)
+2. **컬럼 이름**: snake_case (`first_name`, `created_at`, `updated_at`)
+3. **외래 키**: `테이블_id` 형식 (`student_id`, `group_id`, `session_id`)
+4. **중간 테이블**: 두 테이블 이름을 조합하여 snake_case (`student_groups`, `template_groups`)
+
+### Sequelize 모델 설정
+
+모든 Sequelize 모델은 다음 설정을 포함해야 합니다:
+
+```javascript
+{
+  sequelize,
+  modelName: 'ModelName', // PascalCase
+  tableName: 'table_names', // snake_case, 복수형
+  underscored: true // 이 옵션이 필요합니다! DB에서 snake_case 사용
+}
+```
+
+### JavaScript/TypeScript 코드 작성 시 주의사항
+
+1. 모델 정의 시 속성은 camelCase로 정의하되, `underscored: true` 옵션을 활성화하여 DB에서는 snake_case로 변환
+2. SQL 쿼리 작성 시 항상 snake_case로 컬럼 참조 (`"updated_at"`, `"created_at"`)
+3. 기존 모델을 수정할 때는 마이그레이션 파일 생성 필요
+
+### 오류 해결 방법
+
+데이터베이스 column 이름 충돌 오류가 발생하는 경우:
+
+1. 모델 파일에서 `underscored: true` 설정 확인
+2. 직접 SQL 쿼리를 사용하는 경우 컬럼 이름을 snake_case로 변경
+3. 필요한 경우 마이그레이션 파일을 생성하여 컬럼 이름 변경
+
 ## 라이센스
 
 [MIT](LICENSE)
