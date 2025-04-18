@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import axios from 'axios';
+import * as adminService from '../../../services/adminService';
 import api from '../../../utils/api';
 
 const Container = styled.div`
@@ -222,10 +222,7 @@ function GroupsTab() {
   const fetchGroups = async () => {
     setIsLoading(true);
     try {
-      const adminAuth = JSON.parse(localStorage.getItem('adminAuth') || '{}');
-      const response = await axios.get('/api/admin/groups', {
-        headers: { 'x-auth-token': adminAuth.token || '' }
-      });
+      const response = await api.get('/admin/groups');
       // The API now returns groups with their students included
       setGroups(response.data);
       setError(null);
@@ -264,7 +261,7 @@ function GroupsTab() {
     }
     
     try {
-      await axios.delete(`/api/admin/groups/${groupId}`);
+      await adminService.deleteGroup(groupId);
       
       // Update local state
       setGroups(groups.filter(group => group.id !== groupId));
@@ -291,20 +288,15 @@ function GroupsTab() {
     e.preventDefault();
     
     try {
-      const adminAuth = JSON.parse(localStorage.getItem('adminAuth') || '{}');
-      const config = {
-        headers: { 'x-auth-token': adminAuth.token || '' }
-      };
-
       if (modalMode === 'add') {
         // Add mode
-        await axios.post('/api/admin/groups', formData, config);
+        await adminService.createGroup(formData);
         
         // Refresh the group list
         fetchGroups();
       } else {
         // Edit mode
-        await axios.put(`/api/admin/groups/${currentGroup.id}`, formData, config);
+        await adminService.updateGroup(currentGroup.id, formData);
         
         // Update in UI without a full reload
         setGroups(groups.map(group => {

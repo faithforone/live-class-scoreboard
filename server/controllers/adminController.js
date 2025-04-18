@@ -698,7 +698,7 @@ exports.updateStudentScore = async (req, res) => {
     // 세션 참가자 조회
     const participant = await SessionParticipant.findOne({
       where: {
-        classSessionId: sessionId,
+        sessionId: sessionId,
         studentId: studentId
       },
       include: [{

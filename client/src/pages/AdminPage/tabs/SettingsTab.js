@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import axios from 'axios';
+import api from '../../../utils/api';
+import * as adminService from '../../../services/adminService';
 
 const Container = styled.div`
   background-color: white;
@@ -55,17 +57,17 @@ const FormGroup = styled.div`
 `;
 
 const Button = styled.button`
-  background-color: ${props => props.danger ? '#f44336' : props.primary ? '#3f51b5' : '#f0f0f0'};
-  color: ${props => (props.danger || props.primary) ? 'white' : '#333'};
+  background-color: ${props => props.$danger ? '#f44336' : props.$primary ? '#3f51b5' : '#f0f0f0'};
+  color: ${props => (props.$danger || props.$primary) ? 'white' : '#333'};
   border: none;
   padding: 10px 15px;
   border-radius: 4px;
   cursor: pointer;
-  font-weight: ${props => props.bold ? 'bold' : 'normal'};
+  font-weight: ${props => props.$bold ? 'bold' : 'normal'};
   align-self: flex-start;
   
   &:hover {
-    background-color: ${props => props.danger ? '#d32f2f' : props.primary ? '#303f9f' : '#e0e0e0'};
+    background-color: ${props => props.$danger ? '#d32f2f' : props.$primary ? '#303f9f' : '#e0e0e0'};
   }
   
   &:disabled {
@@ -155,7 +157,7 @@ function SettingsTab() {
     try {
       // Update teacher password
       if (passwordFormData.teacherPassword) {
-        await axios.post('/api/admin/password', {
+        await api.post('/admin/password', {
           type: 'teacher_password',
           password: passwordFormData.teacherPassword
         });
@@ -163,7 +165,7 @@ function SettingsTab() {
       
       // Update admin password
       if (passwordFormData.adminPassword) {
-        await axios.post('/api/admin/password', {
+        await api.post('/admin/password', {
           type: 'admin_password',
           password: passwordFormData.adminPassword
         });
@@ -189,7 +191,7 @@ function SettingsTab() {
     e.preventDefault();
     
     try {
-      await axios.post('/api/admin/ranking-period', rankingFormData);
+      await api.post('/admin/ranking-period', rankingFormData);
       
       // Show success message
       setRankingStatus({ success: true, error: null });
@@ -303,7 +305,7 @@ function SettingsTab() {
           </FormGroup>
           
           <Button 
-            primary 
+            $primary 
             type="submit"
             disabled={!passwordFormData.teacherPassword && !passwordFormData.adminPassword}
           >
@@ -363,7 +365,7 @@ function SettingsTab() {
             </FormGroup>
           </RankingPeriodRow>
           
-          <Button primary type="submit">랭킹 기간 설정</Button>
+          <Button $primary type="submit">랭킹 기간 설정</Button>
           
           {rankingStatus.success && (
             <SuccessMessage>랭킹 기간이 성공적으로 설정되었습니다.</SuccessMessage>
@@ -382,10 +384,10 @@ function SettingsTab() {
         </p>
         
         <Button 
-          danger
+          $danger
           onClick={() => {
             if (window.confirm('정말 모든 점수 데이터를 초기화하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
-              axios.post('/api/admin/reset-scores')
+              adminService.resetScores({ type: 'all' })
                 .then(() => alert('모든 점수가 초기화되었습니다.'))
                 .catch(err => {
                   console.error('Error resetting scores:', err);

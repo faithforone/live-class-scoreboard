@@ -21,16 +21,16 @@ const ActionsRow = styled.div`
 `;
 
 const Button = styled.button`
-  background-color: ${props => props.danger ? '#f44336' : props.primary ? '#3f51b5' : '#f0f0f0'};
-  color: ${props => (props.danger || props.primary) ? 'white' : '#333'};
+  background-color: ${props => props.$danger ? '#f44336' : props.$primary ? '#3f51b5' : '#f0f0f0'};
+  color: ${props => (props.$danger || props.$primary) ? 'white' : '#333'};
   border: none;
   padding: 10px 15px;
   border-radius: 4px;
   cursor: pointer;
-  font-weight: ${props => props.bold ? 'bold' : 'normal'};
+  font-weight: ${props => props.$bold ? 'bold' : 'normal'};
   
   &:hover {
-    background-color: ${props => props.danger ? '#d32f2f' : props.primary ? '#303f9f' : '#e0e0e0'};
+    background-color: ${props => props.$danger ? '#d32f2f' : props.$primary ? '#303f9f' : '#e0e0e0'};
   }
   
   &:disabled {
@@ -381,7 +381,7 @@ function ClassTemplatesTab() {
       
       <ActionsRow>
         <div></div> {/* Placeholder for alignment */}
-        <Button primary onClick={handleAddClick}>+ 템플릿 추가</Button>
+        <Button $primary onClick={handleAddClick}>+ 템플릿 추가</Button>
       </ActionsRow>
       
       {templates.length === 0 ? (
@@ -404,13 +404,13 @@ function ClassTemplatesTab() {
               </p>
               
               <ActionButtons>
-                <Button primary onClick={() => handleUseTemplate(template)}>
+                <Button $primary onClick={() => handleUseTemplate(template)}>
                   이 템플릿으로 수업 시작
                 </Button>
                 <Button onClick={() => handleEditClick(template)}>
                   수정
                 </Button>
-                <Button danger onClick={() => handleDeleteClick(template.id)}>
+                <Button $danger onClick={() => handleDeleteClick(template.id)}>
                   삭제
                 </Button>
               </ActionButtons>
@@ -481,7 +481,7 @@ function ClassTemplatesTab() {
               
               <ModalFooter>
                 <Button onClick={() => setShowModal(false)}>취소</Button>
-                <Button primary type="submit">
+                <Button $primary type="submit">
                   {modalMode === 'add' ? '추가' : '저장'}
                 </Button>
               </ModalFooter>
