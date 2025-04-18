@@ -12,11 +12,34 @@ function FeedPage() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const socketRef = useRef(null);
+  const pingIntervalRef = useRef(null);
   const [highlightedUpdate, setHighlightedUpdate] = useState(null);
+  // Add a ref to track recently processed updates to avoid duplicates
+  const recentUpdatesRef = useRef(new Set());
   
   // Load session data and establish socket connection
   useEffect(() => {
     console.log("FeedPage mounted with urlIdentifier:", urlIdentifier);
+    
+    let isMounted = true;
+    let socket = null;
+    
+    // Force cleanup on mount to ensure fresh start
+    if (socketRef.current) {
+      console.log('Forcing disconnection of existing socket');
+      socketRef.current.removeAllListeners();
+      socketRef.current.disconnect();
+      socketRef.current = null;
+    }
+    
+    if (pingIntervalRef.current) {
+      console.log('Clearing existing interval');
+      clearInterval(pingIntervalRef.current);
+      pingIntervalRef.current = null;
+    }
+    
+    // Clear deduplication set
+    recentUpdatesRef.current.clear();
     
     if (!urlIdentifier) {
       setError('피드 식별자가 제공되지 않았습니다.');
@@ -24,10 +47,10 @@ function FeedPage() {
       return;
     }
     
-    let sessionData = null;
-    
     // Fetch initial data
     const fetchData = async () => {
+      if (!isMounted) return;
+      
       try {
         console.log('Fetching session data for URL identifier:', urlIdentifier);
         
@@ -35,14 +58,13 @@ function FeedPage() {
         const data = await viewerService.getSessionFeed(urlIdentifier);
         console.log('Session data received:', data);
         
+        if (!isMounted) return;
+        
         if (!data || !data.session) {
           setError('세션 데이터가 올바르지 않습니다.');
           setLoading(false);
           return;
         }
-        
-        // Store session data for socket setup
-        sessionData = data;
         
         // Initialize the session state with data from API
         setSession(data);
@@ -58,47 +80,49 @@ function FeedPage() {
         setLoading(false);
         
         // Now that we have the session data, set up the socket
-        setupSocketConnection(data.session.id);
+        if (isMounted) {
+          setupSocketConnection(data.session.id);
+        }
       } catch (err) {
         console.error('Error fetching session data:', err);
-        setError(err.message || '세션 정보를 불러오는데 실패했습니다.');
-        setLoading(false);
+        if (isMounted) {
+          setError(err.message || '세션 정보를 불러오는데 실패했습니다.');
+          setLoading(false);
+        }
       }
     };
     
-    // Socket connection setup
+    // Helper function to generate a hash for deduplication
+    const generateUpdateHash = (update) => {
+      const { studentId, studentName, points, timestamp } = update;
+      return `${studentId}-${studentName}-${points}-${timestamp || Date.now()}`;
+    };
+    
+    // Socket connection setup - completely rewritten for reliability
     const setupSocketConnection = (sessionId) => {
-      console.log('Setting up socket connection with session ID:', sessionId);
+      if (!isMounted) return;
       
-      // Clean up any existing socket
-      if (socketRef.current) {
-        console.log('Cleaning up existing socket connection');
-        socketRef.current.disconnect();
-        socketRef.current = null;
-      }
+      console.log('Setting up NEW socket connection with session ID:', sessionId);
       
       // Socket URL - use environment variable or fall back to origin
       const socketUrl = process.env.REACT_APP_SOCKET_URL || window.location.origin;
       console.log('Connecting to socket at:', socketUrl);
       
       // Create new socket connection with explicit options
-      const socket = io(socketUrl, {
+      socket = io(socketUrl, {
         reconnectionDelayMax: 10000,
         reconnectionAttempts: 10,
-        transports: ['websocket', 'polling']
+        transports: ['websocket', 'polling'],
+        forceNew: true,
+        autoConnect: true
       });
       
       // Store socket reference
       socketRef.current = socket;
       
-      // Set up catch-all event listener for debugging
-      socket.onAny((event, ...args) => {
-        console.log(`🌐 Socket event: ${event}`, args);
-      });
-      
-      // Socket event listeners
+      // Setup all event handlers
       socket.on('connect', () => {
-        console.log('Socket connected successfully with ID:', socket.id);
+        console.log('Socket connected with ID:', socket.id);
         setConnected(true);
         
         // Join the feed room with proper room name format
@@ -114,90 +138,158 @@ function FeedPage() {
         }
       });
       
+      // Remove all existing event listeners before adding new ones
+      socket.removeAllListeners('scoreUpdate');
+      socket.removeAllListeners('sessionEnded');
+      socket.removeAllListeners('roomJoined');
+      socket.removeAllListeners('roomTest');
+      
+      // Setup ping interval
+      pingIntervalRef.current = setInterval(() => {
+        if (socket && socket.connected) {
+          console.log('Sending ping');
+          socket.emit('ping');
+        }
+      }, 30000);
+      
+      // Setup event handlers
+      socket.on('pong', () => console.log('Received pong'));
+      
       socket.on('connect_error', (err) => {
         console.error('Socket connection error:', err);
         setConnected(false);
       });
       
-      socket.on('reconnect_attempt', (attempt) => {
-        console.log(`Socket reconnection attempt ${attempt}`);
+      socket.on('reconnect_attempt', attempt => {
+        console.log(`Reconnection attempt ${attempt}`);
       });
       
       socket.on('reconnect', () => {
-        console.log('Socket reconnected successfully');
+        console.log('Socket reconnected');
         setConnected(true);
       });
       
-      socket.on('disconnect', (reason) => {
-        console.log('Socket disconnected, reason:', reason);
+      socket.on('disconnect', reason => {
+        console.log(`Socket disconnected: ${reason}`);
         setConnected(false);
       });
       
+      socket.on('roomJoined', data => {
+        console.log('✅ Room joined:', data);
+      });
+      
+      socket.on('roomTest', data => {
+        console.log('✅ Room test:', data);
+      });
+      
+      // Handle score updates - with deduplication
       socket.on('scoreUpdate', (data) => {
-        console.log('🔴 REAL-TIME UPDATE RECEIVED:', data);
+        console.log('🔴 SCORE UPDATE:', data);
         
-        // Create a unique ID for this update
-        const updateId = `live-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-        
-        // Add the new update to our list with all necessary data
-        const newUpdate = { 
-          ...data, 
-          id: updateId,
-          studentName: data.studentName || 'Unknown Student',
-          points: data.points || data.change || 0,
-          timestamp: data.timestamp || new Date().toISOString(),
-          fadeOut: false
-        };
-        
-        // Update state with the new update at the beginning of the array
-        setScoreUpdates(prev => {
-          const newUpdates = [newUpdate, ...prev];
-          // Limit to 20 items
-          return newUpdates.slice(0, 20);
-        });
-        
-        // Highlight this update
-        setHighlightedUpdate(updateId);
-        
-        // Remove highlight after animation completes (5 seconds)
-        setTimeout(() => {
-          console.log(`Removing highlight for update ${updateId}`);
-          setHighlightedUpdate(prev => prev === updateId ? null : prev);
-        }, 5000);
-        
-        // Start fadeout after delay (10 seconds)
-        setTimeout(() => {
-          console.log(`Setting fadeOut=true for update ${updateId}`);
-          setScoreUpdates(prev => 
-            prev.map(update => 
-              update.id === updateId ? {...update, fadeOut: true} : update
-            )
-          );
+        try {
+          // Generate a hash for this update to detect duplicates
+          const updateHash = generateUpdateHash(data);
           
-          // Remove completely after fadeout animation completes (1 more second)
+          // Check if this is a duplicate update
+          if (recentUpdatesRef.current.has(updateHash)) {
+            console.log('⚠️ Duplicate update detected and ignored:', updateHash);
+            return;
+          }
+          
+          // Add to recent updates set for deduplication
+          recentUpdatesRef.current.add(updateHash);
+          
+          // Remove from deduplication set after 2 seconds to prevent memory buildup
           setTimeout(() => {
-            console.log(`Removing update ${updateId} from DOM`);
-            setScoreUpdates(prev => prev.filter(update => update.id !== updateId));
-          }, 1000);
-        }, 10000);
+            recentUpdatesRef.current.delete(updateHash);
+          }, 2000);
+          
+          const updateId = `live-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+          
+          const newUpdate = { 
+            ...data, 
+            id: updateId,
+            studentName: data.studentName || 'Unknown Student',
+            points: data.points || data.change || 0,
+            timestamp: data.timestamp || new Date().toISOString(),
+            animationState: 'new'
+          };
+          
+          console.log('New update:', newUpdate);
+          
+          setScoreUpdates(prev => {
+            const newUpdates = [newUpdate, ...prev];
+            return newUpdates.slice(0, 20);
+          });
+          
+          // Set highlighted state
+          setHighlightedUpdate(updateId);
+          
+          // After highlight period, start fade preparation
+          setTimeout(() => {
+            if (!isMounted) return;
+            setHighlightedUpdate(prev => prev === updateId ? null : prev);
+            
+            // Start fadeout after delay
+            setTimeout(() => {
+              if (!isMounted) return;
+              
+              console.log(`Starting fadeout for update ${updateId}`);
+              setScoreUpdates(prev => 
+                prev.map(update => 
+                  update.id === updateId ? {...update, animationState: 'fading'} : update
+                )
+              );
+              
+              // Remove after fadeout animation completes
+              setTimeout(() => {
+                if (!isMounted) return;
+                
+                console.log(`Removing update ${updateId}`);
+                setScoreUpdates(prev => prev.filter(update => update.id !== updateId));
+              }, 2100); // Animation duration + small buffer
+              
+            }, 12000); // Show for 12 seconds before fade starts
+          }, 2000); // Highlight duration reduced to 2 seconds to match CSS
+        } catch (err) {
+          console.error('Error processing update:', err);
+        }
       });
       
       socket.on('sessionEnded', () => {
-        console.log('Received sessionEnded event');
+        console.log('Session ended');
         setError('수업 세션이 종료되었습니다.');
       });
     };
     
-    // Start the data fetching process
+    // Start data fetching
     fetchData();
     
     // Cleanup function
     return () => {
-      console.log('FeedPage unmounting - cleaning up socket');
+      console.log('FeedPage unmounting - complete cleanup');
+      isMounted = false;
+      
+      if (pingIntervalRef.current) {
+        clearInterval(pingIntervalRef.current);
+        pingIntervalRef.current = null;
+      }
+      
+      if (socket) {
+        console.log('Disconnecting socket on unmount');
+        socket.removeAllListeners();
+        socket.disconnect();
+      }
+      
       if (socketRef.current) {
+        console.log('Disconnecting socketRef on unmount');
+        socketRef.current.removeAllListeners();
         socketRef.current.disconnect();
         socketRef.current = null;
       }
+      
+      // Clear deduplication set on unmount
+      recentUpdatesRef.current.clear();
     };
   }, [urlIdentifier]);
   
@@ -264,7 +356,7 @@ function FeedPage() {
                   key={log.id || index} 
                   className={`update-item ${log.points > 0 ? 'positive' : 'negative'} ${
                     log.id === highlightedUpdate ? 'highlighted' : ''
-                  } ${log.fadeOut ? 'fade-out' : ''}`}
+                  } ${log.animationState === 'fading' ? 'fade-out' : ''}`}
                 >
                   <div className="update-info">
                     <span className="student-name">{log.studentName}</span>

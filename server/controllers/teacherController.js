@@ -496,14 +496,29 @@ exports.updateScore = async (req, res) => {
         
         console.log(`Emitting to socket rooms: ${sessionRoom}, ${feedRoom}`);
         
-        // Direct emit to each room
-        io.to(sessionRoom).emit('scoreUpdate', payload);
-        io.to(feedRoom).emit('scoreUpdate', payload);
+        // Get all namespaces from io object
+        const mainIo = io.io || io; // Handle both cases: when io is the main object or when it's the returned object from setupSocket
         
-        // Also broadcast to all clients
-        io.emit('scoreUpdate', payload);
+        // 1. Emit to main namespace rooms
+        mainIo.to(sessionRoom).emit('scoreUpdate', payload);
+        mainIo.to(feedRoom).emit('scoreUpdate', payload);
         
-        console.log('Socket.io message emitted successfully');
+        // 2. Emit to all connected clients on main namespace
+        mainIo.emit('scoreUpdate', payload);
+        
+        // 3. If scoreFeed namespace exists, emit there too
+        if (io.scoreFeed) {
+          io.scoreFeed.emit('scoreUpdate', payload);
+          io.scoreFeed.to(sessionRoom).emit('scoreUpdate', payload);
+        }
+        
+        // 4. Broadcast to all namespaces (as a fallback)
+        Object.keys(mainIo.nsps || {}).forEach(namespace => {
+          console.log(`Broadcasting to namespace: ${namespace}`);
+          mainIo.of(namespace).emit('scoreUpdate', payload);
+        });
+        
+        console.log('Socket.io message emitted to all possible targets');
       } else {
         console.warn('Socket.io instance not available, skipping real-time update');
       }

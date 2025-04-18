@@ -16,6 +16,12 @@ module.exports = (server) => {
   io.on('connection', (socket) => {
     console.log('New client connected:', socket.id);
     
+    // Handle ping for keepalive
+    socket.on('ping', () => {
+      console.log(`Received ping from client: ${socket.id}`);
+      socket.emit('pong');
+    });
+    
     // Handle joinFeed event for feed pages
     socket.on('joinFeed', (urlIdentifier) => {
       if (!urlIdentifier) return;
@@ -23,6 +29,22 @@ module.exports = (server) => {
       const roomName = `feed-${urlIdentifier}`;
       socket.join(roomName);
       console.log(`Socket ${socket.id} joined feed room: ${roomName}`);
+      
+      // Send diagnostic message to confirm room join
+      socket.emit('roomJoined', { 
+        room: roomName, 
+        message: 'Successfully joined feed room' 
+      });
+      
+      // Broadcast to this room to test if events are properly routed
+      setTimeout(() => {
+        io.to(roomName).emit('roomTest', { 
+          message: 'Test message for feed room',
+          room: roomName,
+          timestamp: new Date().toISOString()
+        });
+        console.log(`Sent test message to room: ${roomName}`);
+      }, 2000);
     });
     
     // Handle join session event
@@ -32,6 +54,12 @@ module.exports = (server) => {
       const roomName = `session-${sessionId}`;
       socket.join(roomName);
       console.log(`Socket ${socket.id} joined session room: ${roomName}`);
+      
+      // Send diagnostic message to confirm room join
+      socket.emit('roomJoined', { 
+        room: roomName, 
+        message: 'Successfully joined session room' 
+      });
     });
     
     socket.on('disconnect', () => {
