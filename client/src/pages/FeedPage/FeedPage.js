@@ -1,373 +1,276 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import JSConfetti from 'js-confetti';
 import io from 'socket.io-client';
 import './FeedPage.css';
 import * as viewerService from '../../services/viewerService';
 
+const MAX_LOG_ENTRIES = 20; // 최근 점수 변동 목록 최대 개수
+
 function FeedPage() {
   const { urlIdentifier } = useParams();
   const [session, setSession] = useState(null);
-  const [connected, setConnected] = useState(false);
-  const [scoreUpdates, setScoreUpdates] = useState([]);
   const [participantsWithScores, setParticipantsWithScores] = useState([]);
-  const [previousTopStudentId, setPreviousTopStudentId] = useState(null);
+  const [scoreUpdatesLog, setScoreUpdatesLog] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
-  
-  const socketRef = useRef(null);
-  const pingIntervalRef = useRef(null);
-  const [highlightedUpdate, setHighlightedUpdate] = useState(null);
-  const recentUpdatesRef = useRef(new Set());
+  const [isConnected, setIsConnected] = useState(false);
+
   const jsConfettiRef = useRef(null);
-  
-  // Initialize confetti instance
+  const socketRef = useRef(null);
+  const previousTopStudentIdRef = useRef(null); // 이전 1등 학생 ID를 ref로 관리
+
+  // Confetti 인스턴스 초기화
   useEffect(() => {
     jsConfettiRef.current = new JSConfetti();
-    return () => {
-      jsConfettiRef.current = null;
-    };
   }, []);
-  
-  // Load session data and establish socket connection
+
+  // 순위 계산 및 참가자 데이터 처리 함수
+  const processParticipantsData = useCallback((participants) => {
+    if (!participants || participants.length === 0) {
+      return [];
+    }
+
+    // 1. 점수 내림차순, 이름 오름차순 정렬
+    const sorted = [...participants].sort((a, b) => {
+      if (b.currentScore !== a.currentScore) {
+        return b.currentScore - a.currentScore;
+      }
+      return (a.studentName || "").localeCompare(b.studentName || "");
+    });
+
+    // 2. 공동 순위 부여 (예: 1, 2, 2, 4)
+    let rank = 1;
+    const rankedParticipants = sorted.map((p, index) => {
+      if (index > 0 && p.currentScore < sorted[index - 1].currentScore) {
+        rank = index + 1;
+      }
+      return { ...p, rank };
+    });
+
+    // 3. 1등 변경 시 Confetti 효과
+    if (rankedParticipants.length > 0) {
+      const currentTopStudent = rankedParticipants[0];
+      // 여러 명이 공동 1등일 수 있으므로, 점수가 같은 모든 1등을 찾음
+      const topScorers = rankedParticipants.filter(p => p.rank === 1);
+
+      if (topScorers.length > 0) {
+        const currentTopStudentId = topScorers[0].studentId; // 대표 1등 ID (정렬상 첫번째)
+        
+        // 이전 1등과 현재 1등이 다르고, 이전 1등이 존재했을 경우 Confetti
+        if (previousTopStudentIdRef.current !== null && currentTopStudentId !== previousTopStudentIdRef.current) {
+          // 공동 1등 중 새로운 사람이 포함되었는지 확인 (더 정확한 조건)
+          const previousTopExistsInNewTop = topScorers.some(ts => ts.studentId === previousTopStudentIdRef.current);
+          if (!previousTopExistsInNewTop || topScorers.length > 1) { // 이전 1등이 더이상 1등이 아니거나, 새로운 공동 1등이 나타난 경우
+            console.log(`[FeedPage] Top student changed! Old: ${previousTopStudentIdRef.current}, New: ${currentTopStudentId}. Firing confetti!`);
+            jsConfettiRef.current?.addConfetti({
+              emojis: ['🏆', '🥇', '🎉', '⭐', '🚀'],
+              emojiSize: 80,
+              confettiNumber: 50,
+            });
+          }
+        }
+        previousTopStudentIdRef.current = currentTopStudentId; // 새로운 1등 학생 ID 업데이트 (ref 사용)
+      } else {
+        previousTopStudentIdRef.current = null; // 1등이 없는 경우
+      }
+    } else {
+      previousTopStudentIdRef.current = null;
+    }
+
+    return rankedParticipants;
+  }, []); // 의존성 배열 비움, ref는 업데이트해도 리렌더링 유발 안함
+
+  // 초기 데이터 로드
   useEffect(() => {
-    console.log("[FeedPage] Mounted with urlIdentifier:", urlIdentifier);
-    
     let isMounted = true;
-    let socket = null;
-    
-    // Force cleanup on mount to ensure fresh start
-    if (socketRef.current) {
-      console.log('[FeedPage] Forcing disconnection of existing socket');
-      socketRef.current.removeAllListeners();
-      socketRef.current.disconnect();
-      socketRef.current = null;
-    }
-    
-    if (pingIntervalRef.current) {
-      console.log('[FeedPage] Clearing existing interval');
-      clearInterval(pingIntervalRef.current);
-      pingIntervalRef.current = null;
-    }
-    
-    // Clear deduplication set
-    recentUpdatesRef.current.clear();
-    
-    if (!urlIdentifier) {
-      setError('피드 식별자가 제공되지 않았습니다.');
-      setLoading(false);
-      return;
-    }
-    
-    // Fetch initial data
     const fetchData = async () => {
-      if (!isMounted) return;
-      
+      if (!isMounted || !urlIdentifier) {
+        if (!urlIdentifier && isMounted) setError("피드 식별자가 제공되지 않았습니다.");
+        if (isMounted) setLoading(false);
+        return;
+      }
       try {
-        console.log('[FeedPage] Fetching session data for URL identifier:', urlIdentifier);
-        
-        // Get initial session data
+        if (isMounted) setLoading(true);
+        console.log('[FeedPage] Fetching initial data for urlIdentifier:', urlIdentifier);
         const data = await viewerService.getSessionFeed(urlIdentifier);
-        console.log('[FeedPage] Session data received:', data);
-        
+        console.log('[FeedPage] Initial data received:', data);
+
         if (!isMounted) return;
-        
+
         if (!data || !data.session) {
-          setError('세션 데이터가 올바르지 않습니다.');
-          setLoading(false);
-          return;
-        }
-        
-        // Initialize the session state with data from API
-        setSession(data.session);
-        
-        // Initialize score updates with initial data
-        const initialLogs = data.scoreLogs || [];
-        // Add unique IDs to each log for tracking
-        const logsWithIds = initialLogs.map(log => ({
-          ...log, 
-          id: `initial-${Math.random().toString(36).substr(2, 9)}`
-        }));
-        setScoreUpdates(logsWithIds);
-        
-        // Initialize participants with scores for ranking
-        setParticipantsWithScores(data.participants || []);
-        
-        // Set initial top student
-        if (data.participants && data.participants.length > 0) {
-          // Participants are already sorted by score from the server
-          setPreviousTopStudentId(data.participants[0].studentId);
-          console.log('[FeedPage] Initial top student ID:', data.participants[0].studentId);
-        }
-        
-        setLoading(false);
-        
-        // Now that we have the session data, set up the socket
-        if (isMounted) {
-          setupSocketConnection(data.session.id);
+          setError('세션 데이터를 가져오지 못했습니다.');
+          setParticipantsWithScores([]);
+        } else {
+          setSession({
+            id: data.session.id,
+            title: data.session.title || '실시간 스코어보드',
+            status: data.session.status
+          });
+          
+          const processedParticipants = processParticipantsData(data.participants || []);
+          setParticipantsWithScores(processedParticipants);
+          
+          // 초기 1등 설정 (processParticipantsData 내부에서 ref로 처리됨)
+
+          setScoreUpdatesLog(
+            (data.scoreLogs || []).map(log => ({ 
+              ...log, 
+              id: `initial-${log.studentId}-${log.timestamp}-${Math.random().toString(36).substr(2, 5)}` // 더 고유한 ID
+            })).slice(0, MAX_LOG_ENTRIES)
+          );
+          setError(null);
         }
       } catch (err) {
+        if (!isMounted) return;
         console.error('[FeedPage] Error fetching session data:', err);
-        if (isMounted) {
-          setError(err.message || '세션 정보를 불러오는데 실패했습니다.');
-          setLoading(false);
-        }
+        setError(err.message || '세션 정보를 불러오는데 실패했습니다.');
+        setParticipantsWithScores([]);
+      } finally {
+        if (isMounted) setLoading(false);
       }
     };
-    
-    // Helper function to generate a hash for deduplication
-    const generateUpdateHash = (update) => {
-      const { studentId, studentName, points, timestamp } = update;
-      return `${studentId}-${studentName}-${points}-${timestamp || Date.now()}`;
-    };
-    
-    // Socket connection setup
-    const setupSocketConnection = (sessionId) => {
-      if (!isMounted) return;
-      
-      console.log('[FeedPage] Setting up NEW socket connection with session ID:', sessionId);
-      
-      // Socket URL - use environment variable or fall back to origin
-      const socketUrl = process.env.REACT_APP_SOCKET_URL || window.location.origin;
-      console.log('[FeedPage] Connecting to socket at:', socketUrl);
-      
-      // Create new socket connection with explicit options
-      socket = io(socketUrl, {
-        reconnectionDelayMax: 10000,
-        reconnectionAttempts: 10,
-        transports: ['websocket', 'polling'],
-        forceNew: true,
-        autoConnect: true
-      });
-      
-      // Store socket reference
-      socketRef.current = socket;
-      
-      // Setup all event handlers
-      socket.on('connect', () => {
-        console.log('[FeedPage] Socket connected with ID:', socket.id);
-        setConnected(true);
-        
-        // Join the feed room with proper room name format
-        const roomName = `feed-${urlIdentifier}`;
-        console.log(`[FeedPage] Joining feed room: ${roomName}`);
-        socket.emit('joinFeed', urlIdentifier);
-        
-        // Also try joining with session ID as fallback
-        if (sessionId) {
-          const sessionRoom = `session-${sessionId}`;
-          console.log(`[FeedPage] Also joining session room: ${sessionRoom}`);
-          socket.emit('joinSession', sessionId);
-        }
-      });
-      
-      // Remove all existing event listeners before adding new ones
-      socket.removeAllListeners('scoreUpdate');
-      socket.removeAllListeners('sessionEnded');
-      socket.removeAllListeners('roomJoined');
-      socket.removeAllListeners('roomTest');
-      
-      // Setup ping interval
-      pingIntervalRef.current = setInterval(() => {
-        if (socket && socket.connected) {
-          console.log('[FeedPage] Sending ping');
-          socket.emit('ping');
-        }
-      }, 30000);
-      
-      // Setup event handlers
-      socket.on('pong', () => console.log('[FeedPage] Received pong'));
-      
-      socket.on('connect_error', (err) => {
-        console.error('[FeedPage] Socket connection error:', err);
-        setConnected(false);
-      });
-      
-      socket.on('reconnect_attempt', attempt => {
-        console.log(`[FeedPage] Reconnection attempt ${attempt}`);
-      });
-      
-      socket.on('reconnect', () => {
-        console.log('[FeedPage] Socket reconnected');
-        setConnected(true);
-      });
-      
-      socket.on('disconnect', reason => {
-        console.log(`[FeedPage] Socket disconnected: ${reason}`);
-        setConnected(false);
-      });
-      
-      socket.on('roomJoined', data => {
-        console.log('[FeedPage] ✅ Room joined:', data);
-      });
-      
-      socket.on('roomTest', data => {
-        console.log('[FeedPage] ✅ Room test:', data);
-      });
-      
-      // Handle score updates - with deduplication
-      socket.on('scoreUpdate', (data) => {
-        console.log('[FeedPage] 🔴 SCORE UPDATE:', data);
-        
-        try {
-          // Generate a hash for this update to detect duplicates
-          const updateHash = generateUpdateHash(data);
-          
-          // Check if this is a duplicate update
-          if (recentUpdatesRef.current.has(updateHash)) {
-            console.log('[FeedPage] ⚠️ Duplicate update detected and ignored:', updateHash);
-            return;
-          }
-          
-          // Add to recent updates set for deduplication
-          recentUpdatesRef.current.add(updateHash);
-          
-          // Remove from deduplication set after 2 seconds to prevent memory buildup
-          setTimeout(() => {
-            recentUpdatesRef.current.delete(updateHash);
-          }, 2000);
-          
-          const updateId = `live-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-          
-          const newUpdate = { 
-            ...data, 
-            id: updateId,
-            studentName: data.studentName || 'Unknown Student',
-            points: data.points || data.change || 0,
-            timestamp: data.timestamp || new Date().toISOString(),
-            animationState: 'new'
-          };
-          
-          console.log('[FeedPage] New update:', newUpdate);
-          
-          // Update the scoreUpdates state (for the right side of the UI)
-          setScoreUpdates(prev => {
-            const newUpdates = [newUpdate, ...prev];
-            return newUpdates.slice(0, 20);
-          });
-          
-          // Update the participants scores (for the left side/ranking)
-          setParticipantsWithScores(prev => {
-            // Create new array with updated score for the affected student
-            const updated = prev.map(participant => {
-              if (participant.studentId === data.studentId) {
-                return {
-                  ...participant,
-                  currentScore: data.newScore
-                };
-              }
-              return participant;
-            });
-            
-            // Sort by score (descending) and then by name (ascending)
-            const sorted = [...updated].sort((a, b) => 
-              b.currentScore - a.currentScore || 
-              a.studentName.localeCompare(b.studentName)
-            );
-            
-            // Check if the top student has changed
-            if (sorted.length > 0) {
-              const newTopStudentId = sorted[0].studentId;
-              
-              // If we had a previous top student and it's different now
-              if (previousTopStudentId !== null && 
-                  newTopStudentId !== previousTopStudentId) {
-                console.log(`[FeedPage] 🎉 TOP STUDENT CHANGED: ${previousTopStudentId} -> ${newTopStudentId}`);
-                
-                // Trigger confetti effect
-                if (jsConfettiRef.current) {
-                  jsConfettiRef.current.addConfetti({
-                    emojis: ['🏆', '🥇', '🎉', '⭐', '🚀'],
-                    emojiSize: 70,
-                    confettiNumber: 50,
-                  });
-                }
-                
-                // Update the previous top student ID for next comparison
-                setPreviousTopStudentId(newTopStudentId);
-              }
-            }
-            
-            return sorted;
-          });
-          
-          // Set highlighted state
-          setHighlightedUpdate(updateId);
-          
-          // After highlight period, start fade preparation
-          setTimeout(() => {
-            if (!isMounted) return;
-            setHighlightedUpdate(prev => prev === updateId ? null : prev);
-            
-            // Start fadeout after delay
-            setTimeout(() => {
-              if (!isMounted) return;
-              
-              console.log(`[FeedPage] Starting fadeout for update ${updateId}`);
-              setScoreUpdates(prev => 
-                prev.map(update => 
-                  update.id === updateId ? {...update, animationState: 'fading'} : update
-                )
-              );
-              
-              // Remove after fadeout animation completes
-              setTimeout(() => {
-                if (!isMounted) return;
-                
-                console.log(`[FeedPage] Removing update ${updateId}`);
-                setScoreUpdates(prev => prev.filter(update => update.id !== updateId));
-              }, 2100); // Animation duration + small buffer
-              
-            }, 12000); // Show for 12 seconds before fade starts
-          }, 2000); // Highlight duration reduced to 2 seconds to match CSS
-        } catch (err) {
-          console.error('[FeedPage] Error processing update:', err);
-        }
-      });
-      
-      socket.on('sessionEnded', () => {
-        console.log('[FeedPage] Session ended');
-        setError('수업 세션이 종료되었습니다.');
-        setSession(prev => prev ? { ...prev, status: '종료됨' } : null);
-      });
-    };
-    
-    // Start data fetching
+
     fetchData();
+    return () => { isMounted = false; };
+  }, [urlIdentifier, processParticipantsData]);
+
+  // Socket.IO 연결 및 이벤트 처리
+  useEffect(() => {
+    if (!session?.id || !urlIdentifier) { // 세션 ID나 urlIdentifier 없으면 실행 안함
+        if (socketRef.current) { // 기존 소켓이 있다면 정리
+            socketRef.current.disconnect();
+            socketRef.current = null;
+            setIsConnected(false);
+        }
+      return;
+    }
+
+    let isMounted = true;
+
+    // 기존 소켓 연결이 있다면 정리
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+    }
+
+    const socket_server_url = process.env.REACT_APP_SOCKET_URL || (window.location.hostname === 'localhost' ? `http://${window.location.hostname}:5001` : window.location.origin);
     
-    // Cleanup function
+    // '/score-feed' 네임스페이스에 연결
+    socketRef.current = io(`${socket_server_url}/score-feed`, {
+      reconnectionAttempts: 5,
+      timeout: 10000,
+      transports: ['websocket', 'polling'],
+      query: { urlIdentifier: urlIdentifier, sessionId: session.id } // 연결 시 쿼리로 정보 전달
+    });
+    const socket = socketRef.current;
+
+    console.log(`[FeedPage] Attempting to connect to socket NS: /score-feed for session: ${session.id}, urlId: ${urlIdentifier}`);
+
+    socket.on('connect', () => {
+      if (!isMounted) return;
+      console.log(`[FeedPage] Socket connected to /score-feed. Socket ID: ${socket.id}`);
+      setIsConnected(true);
+      // 서버에 `joinFeed` 이벤트 emit (urlIdentifier 또는 sessionId 사용)
+      // 서버 측 socket.js 에서 이 이벤트를 받아 해당 room에 join 시켜야 함
+      socket.emit('joinFeed', urlIdentifier); // 혹은 session.id (서버 로직에 따라)
+      console.log(`[FeedPage] Emitted 'joinFeed' with identifier: ${urlIdentifier}`);
+    });
+
+    socket.on('disconnect', (reason) => {
+      if (!isMounted) return;
+      console.log(`[FeedPage] Socket disconnected from /score-feed. Reason: ${reason}`);
+      setIsConnected(false);
+    });
+
+    socket.on('connect_error', (err) => {
+      if (!isMounted) return;
+      console.error(`[FeedPage] Socket connection error to /score-feed:`, err.message);
+      setIsConnected(false);
+    });
+
+    socket.on('scoreUpdate', (data) => {
+      if (!isMounted) return;
+      console.log('[FeedPage] Score update received via socket:', data);
+
+      // 세션 ID 일치 확인 (중요)
+      if (data.payload && data.payload.sessionId === session.id) {
+        const updatePayload = data.payload;
+        
+        // 1. 오른쪽 점수 변동 로그 업데이트
+        const newLogEntry = {
+          ...updatePayload,
+          id: `live-${updatePayload.studentId}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`, // 더 고유한 ID
+        };
+        setScoreUpdatesLog(prevLogs => [newLogEntry, ...prevLogs].slice(0, MAX_LOG_ENTRIES));
+
+        // 2. 왼쪽 학생 총점 표 업데이트
+        setParticipantsWithScores(prevParticipants => {
+          const updatedParticipants = prevParticipants.map(p =>
+            p.studentId === updatePayload.studentId
+              ? { ...p, currentScore: updatePayload.newScore }
+              : p
+          );
+          return processParticipantsData(updatedParticipants); // 정렬 및 순위 재계산, confetti 처리
+        });
+      } else if (data.sessionId === session.id) { // 페이로드 형식이 다를 경우 대비
+        const updatePayload = data;
+         // 1. 오른쪽 점수 변동 로그 업데이트
+        const newLogEntry = {
+          ...updatePayload,
+          id: `live-${updatePayload.studentId}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`, // 더 고유한 ID
+        };
+        setScoreUpdatesLog(prevLogs => [newLogEntry, ...prevLogs].slice(0, MAX_LOG_ENTRIES));
+
+        // 2. 왼쪽 학생 총점 표 업데이트
+        setParticipantsWithScores(prevParticipants => {
+          const updatedParticipants = prevParticipants.map(p =>
+            p.studentId === updatePayload.studentId
+              ? { ...p, currentScore: updatePayload.newScore }
+              : p
+          );
+          return processParticipantsData(updatedParticipants); // 정렬 및 순위 재계산, confetti 처리
+        });
+      } else {
+        console.log('[FeedPage] Received scoreUpdate for different session:', data.payload?.sessionId || data.sessionId);
+      }
+    });
+    
+    socket.on('sessionEnded', (data) => {
+        if (!isMounted) return;
+        // 세션 ID 일치 확인
+        const endedSessionId = data.payload?.sessionId || data.sessionId;
+        if (endedSessionId === session.id) {
+            console.log('[FeedPage] Session ended event received for current session.');
+            setError('수업 세션이 종료되었습니다.');
+            setSession(prev => prev ? { ...prev, status: '종료됨' } : null);
+            setIsConnected(false); // 연결 종료됨으로 표시
+            if (socketRef.current) { // 소켓 연결도 명시적으로 끊기
+                socketRef.current.disconnect();
+            }
+        } else {
+            console.log('[FeedPage] Received sessionEnded for different session:', endedSessionId);
+        }
+    });
+
     return () => {
-      console.log('[FeedPage] Unmounting - complete cleanup');
       isMounted = false;
-      
-      if (pingIntervalRef.current) {
-        clearInterval(pingIntervalRef.current);
-        pingIntervalRef.current = null;
-      }
-      
-      if (socket) {
-        console.log('[FeedPage] Disconnecting socket on unmount');
-        socket.removeAllListeners();
-        socket.disconnect();
-      }
-      
       if (socketRef.current) {
-        console.log('[FeedPage] Disconnecting socketRef on unmount');
-        socketRef.current.removeAllListeners();
+        console.log(`[FeedPage] Cleaning up socket for /score-feed. Disconnecting.`);
+        socketRef.current.off('connect');
+        socketRef.current.off('disconnect');
+        socketRef.current.off('connect_error');
+        socketRef.current.off('scoreUpdate');
+        socketRef.current.off('sessionEnded');
         socketRef.current.disconnect();
         socketRef.current = null;
       }
-      
-      // Clear deduplication set on unmount
-      recentUpdatesRef.current.clear();
+      setIsConnected(false);
     };
-  }, [urlIdentifier, previousTopStudentId]);
-  
-  // Get time difference in a readable format
+  }, [session?.id, urlIdentifier, processParticipantsData]); // session.id 와 urlIdentifier 변경 시 소켓 재설정
+
   const getTimeAgo = (timestamp) => {
     if (!timestamp) return '방금 전';
-    
-    const seconds = Math.floor((new Date() - new Date(timestamp)) / 1000);
+    const seconds = Math.floor((new Date().getTime() - new Date(timestamp).getTime()) / 1000);
     if (seconds < 2) return '방금 전';
     if (seconds < 60) return `${seconds}초 전`;
     const minutes = Math.floor(seconds / 60);
@@ -377,37 +280,31 @@ function FeedPage() {
     const days = Math.floor(hours / 24);
     return `${days}일 전`;
   };
-  
+
   if (loading) return <div className="feed-loading">피드 로딩 중...</div>;
   if (error && !session) return <div className="feed-error">오류: {error}</div>;
-  
+
   return (
     <div className="feed-container-split">
       <header className="feed-header">
         <h1>{session?.title || '수업 현황'}</h1>
         <div className="connection-status">
-          <span className={`status-indicator ${connected ? 'connected' : 'disconnected'}`}></span>
-          {connected ? '실시간 연결됨' : (session?.status === '종료됨' ? '세션 종료됨' : '연결 끊김')}
+          <span className={`status-indicator ${isConnected ? 'connected' : 'disconnected'}`}></span>
+          {isConnected ? '실시간 연결됨' : (session?.status === '종료됨' ? '세션 종료됨' : '연결 끊김')}
         </div>
       </header>
       {error && session && <p className="feed-error-inline">{error}</p>}
 
       <div className="feed-main-content">
-        {/* 왼쪽: 학생 총점 표 (랭킹) */}
         <div className="participants-scores-section">
           <h2>실시간 순위</h2>
           {participantsWithScores.length > 0 ? (
             <ol className="participants-list-ranked">
-              {participantsWithScores.map((participant, index) => (
-                <li 
-                  key={participant.studentId} 
-                  className={`participant-item-ranked rank-${index + 1} ${
-                    participant.studentId === previousTopStudentId ? 'current-top' : ''
-                  }`}
-                >
-                  <span className="rank-badge-feed">{index + 1}</span>
-                  <span className="name-ranked">{participant.studentName}</span>
-                  <span className="score-ranked">{participant.currentScore}점</span>
+              {participantsWithScores.map((p) => (
+                <li key={p.studentId || p.id} className={`participant-item-ranked rank-${p.rank}`}>
+                  <span className="rank-badge-feed">{p.rank}</span>
+                  <span className="name-ranked">{p.studentName}</span>
+                  <span className="score-ranked">{p.currentScore}점</span>
                 </li>
               ))}
             </ol>
@@ -416,31 +313,27 @@ function FeedPage() {
           )}
         </div>
 
-        {/* 오른쪽: 점수 변동 로그 */}
         <div className="score-updates-log-section">
           <h2>최근 점수 변동</h2>
           <div className="updates-list">
-            {scoreUpdates.length > 0 ? (
-              scoreUpdates.map((update) => (
+            {scoreUpdatesLog.length > 0 ? (
+              scoreUpdatesLog.map((log) => (
                 <div 
-                  key={update.id} 
-                  className={`update-item ${update.points > 0 ? 'positive' : 'negative'} ${
-                    update.id === highlightedUpdate ? 'highlighted' : ''
-                  } ${update.animationState === 'fading' ? 'fade-out' : ''}`}
+                  key={log.id} 
+                  className={`update-item ${log.points > 0 ? 'positive' : 'negative'}`}
                 >
                   <div className="update-info">
-                    <span className="student-name">{update.studentName}</span>
-                    <span className="timestamp">{getTimeAgo(update.timestamp)}</span>
+                    <span className="student-name-log">{log.studentName}</span>
+                    <span className="timestamp-log">{getTimeAgo(log.timestamp)}</span>
                   </div>
-                  <div className="update-score">
-                    <span className="change-value">{update.points > 0 ? '+' : ''}{update.points}</span>
+                  <div className="update-score-details">
+                    <span className="change-value-log">{log.points > 0 ? '+' : ''}{log.points}</span> 
+                    <span className="new-total-log">→ {log.newScore}점</span>
                   </div>
                 </div>
               ))
             ) : (
-              <div className="no-updates">
-                <p>새로운 점수 업데이트가 여기에 표시됩니다.</p>
-              </div>
+              <div className="no-data-placeholder">새로운 점수 업데이트가 여기에 표시됩니다.</div>
             )}
           </div>
         </div>
