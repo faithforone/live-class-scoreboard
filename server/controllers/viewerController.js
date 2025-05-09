@@ -74,16 +74,21 @@ exports.getSessionFeed = async (req, res) => {
     const formattedLogs = scoreLogs.map(log => ({
       timestamp: log.timestamp,
       studentName: log.participant.student.name,
-      points: log.change
+      studentId: log.participant.student_id,
+      points: log.change,
+      newScore: log.participant.score // Include the score if available
     }));
     
-    // 참가자 정보 변환 - 총점 제외
+    // 참가자 정보 변환 - 총점 포함 (랭킹 표시를 위함)
     const formattedParticipants = participants.map(p => ({
       id: p.id,
       studentId: p.student_id,
-      studentName: p.student.name
-      // score 필드 제거: 학생 참여율 향상을 위해
+      studentName: p.student.name,
+      currentScore: p.score || 0 // 현재 점수 제공
     }));
+    
+    // 점수 기준으로 정렬
+    formattedParticipants.sort((a, b) => b.currentScore - a.currentScore || a.studentName.localeCompare(b.studentName));
     
     res.status(200).json({
       session: {

@@ -9,6 +9,7 @@ import {
     getAllStudents, // <<< 아직 구현 안 됐거나 오류 가능성 있음!
     getGroups,
     getGroupStudents,
+    getMyActiveSession, // 추가: 활성 세션 확인 기능
     createClassSession // <<< 함수 이름 수정됨!
 } from '../../services/teacherService';
 // import './ClassPreparation.css'; // CSS 파일 사용 시 주석 해제
@@ -27,33 +28,63 @@ function ClassPreparation() {
 
   // --- 초기 데이터 로딩 ---
   useEffect(() => {
-    const fetchData = async () => {
+    let isMounted = true;
+    const fetchInitialDataAndCheckActiveSession = async () => {
+      if (!isMounted) return;
       try {
         setLoading(true);
         setError(null);
-        // getAllStudents API가 불안정하거나 미구현 상태일 수 있음을 감안
-        const [fetchedStudents, fetchedGroups] = await Promise.all([
-          getAllStudents().catch(err => { // getAllStudents 실패 시 빈 배열 반환 처리
-              console.warn("getAllStudents 호출 실패 (API 미구현 등):", err.message);
-              setError("전체 학생 목록 로딩 실패. 검색/추가 기능이 제한될 수 있습니다."); // 부분 오류 알림
-              return []; // 빈 배열 반환하여 그룹 로딩은 계속 진행
-          }),
-          getGroups()
-        ]);
-        setAllStudents(fetchedStudents || []);
-        setGroups(fetchedGroups || []);
+
+        // 1. 기존 활성 세션 확인
+        const activeSession = await getMyActiveSession();
+        
+        if (isMounted && activeSession && activeSession.id) {
+          // 활성 세션이 있으면 바로 해당 세션으로 이동
+          console.log(`기존 활성 세션 (ID: ${activeSession.id}) 발견. 해당 세션으로 이동합니다.`);
+          navigate(`/teacher/class/${activeSession.id}`);
+          // 여기서 로딩을 멈추거나, navigate 후 컴포넌트가 언마운트되므로 추가 로직 불필요할 수 있음
+          // 다만, 만약을 위해 로딩 상태를 false로 설정
+          setLoading(false); 
+          return; // 추가 데이터 로드 중단
+        }
+        
+        // 2. 활성 세션이 없으면, 학생 및 그룹 목록 로드 (기존 로직)
+        if (isMounted) { // navigate가 발생하지 않았을 경우에만 실행
+          const [fetchedStudents, fetchedGroups] = await Promise.all([
+            getAllStudents().catch(err => { 
+              console.warn("getAllStudents 호출 실패:", err.message);
+              setError(prev => prev ? `${prev}\n전체 학생 목록 로딩 실패.` : "전체 학생 목록 로딩 실패.");
+              return []; 
+            }),
+            getGroups().catch(err => {
+              console.warn("getGroups 호출 실패:", err.message);
+              setError(prev => prev ? `${prev}\n그룹 목록 로딩 실패.` : "그룹 목록 로딩 실패.");
+              return [];
+            })
+          ]);
+          if (isMounted) {
+            setAllStudents(fetchedStudents || []);
+            setGroups(fetchedGroups || []);
+          }
+        }
+
       } catch (err) {
-        // getGroups 실패 등 다른 심각한 오류
-        console.error("초기 데이터 로딩 실패:", err);
-        setError("데이터를 불러오는데 실패했습니다: " + (err.message || 'Unknown error'));
-        setAllStudents([]); // 오류 시 학생/그룹 목록 초기화
-        setGroups([]);
+        if (isMounted) {
+          console.error("초기 데이터 로딩 또는 활성 세션 확인 실패:", err);
+          setError("데이터를 불러오는데 실패했습니다: " + (err.message || 'Unknown error'));
+          setAllStudents([]);
+          setGroups([]);
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
-    fetchData();
-  }, []); // 마운트 시 1회 실행
+
+    fetchInitialDataAndCheckActiveSession();
+    return () => { isMounted = false; };
+  }, [navigate]); // navigate를 의존성 배열에 추가
 
   // --- 콜백 함수들 ---
 
@@ -172,123 +203,115 @@ function ClassPreparation() {
   // ------------------------------------
 
   // --- JSX 렌더링 ---
+  // 초기 로딩 중이거나, 활성 세션으로 navigate 되기 전까지 로딩 메시지 표시
+  if (loading) { 
+    return <div style={styles.container}><p>수업 정보 확인 중...</p></div>;
+  }
+
+  // 로딩 완료 후 내용 표시 (오류 메시지는 항상 표시될 수 있도록 함)
   return (
     <div style={styles.container}>
       <h2>수업 준비</h2>
 
-      {/* 초기 데이터 로딩 표시 */}
-      {loading && <p>데이터 로딩 중...</p>}
-
-      {/* 로딩 완료 후 내용 표시 (오류 메시지는 항상 표시될 수 있도록 함) */}
       {/* 오류 메시지 표시 영역 */}
       {error && <p style={styles.errorText}>오류: {error}</p>}
 
-      {!loading && ( // 초기 로딩 완료 시 (오류 발생했어도 다른 섹션은 렌더링 시도)
-        <>
-          {/* === 템플릿(그룹) 불러오기 === */}
-          {groups.length > 0 && (
-            <div style={styles.section}>
-              <h3>템플릿 불러오기</h3>
-              {groups.map(group => (
-                <button
-                    key={group.id}
-                    onClick={() => handleLoadTemplate(group.id)}
-                    style={styles.button}
-                    // 개별 템플릿 로딩 상태 관리 시 disabled 조건 변경 필요
-                    disabled={startSessionLoading || loading}
-                >
-                  {group.name} 불러오기
-                </button>
-              ))}
-            </div>
-          )}
-           {groups.length === 0 && !error && <p>사용 가능한 템플릿(그룹)이 없습니다.</p>}
-
-          {/* === 학생 검색 및 추가 === */}
-          <div style={styles.section}>
-            <h3>학생 검색 및 추가</h3>
-            <input
-              type="text"
-              placeholder="학생 이름 검색 (전체 학생 목록 로딩 필요)"
-              value={searchTerm}
-              onChange={handleSearchChange}
-              style={styles.input}
-              disabled={startSessionLoading || loading || allStudents.length === 0} // 학생 목록 없으면 비활성화
-            />
-            {/* 검색 결과 (allStudents 로딩 완료 및 검색어 입력 시) */}
-            {searchTerm && allStudents.length > 0 && (
-              <ul style={styles.list}>
-                {filteredStudents.length > 0 ? (
-                  filteredStudents.map(student => (
-                    <li key={student.id} style={styles.listItem}>
-                      <span>{student.name}</span>
-                      <button onClick={() => handleAddStudent(student)} style={styles.addButton} disabled={startSessionLoading || loading}>
-                        추가
-                      </button>
-                    </li>
-                  ))
-                ) : (
-                  <li style={styles.listItem}>검색 결과가 없습니다.</li>
-                )}
-              </ul>
-            )}
-             {/* allStudents 로딩 실패 또는 빈 경우 메시지 */}
-             {allStudents.length === 0 && !loading && <p style={{fontSize: '0.9em', color: '#6c757d'}}>전체 학생 목록을 불러올 수 없어 검색/추가 기능을 사용할 수 없습니다.</p>}
-          </div>
-
-          {/* === 현재 로비 학생 목록 === */}
-          <div style={styles.section}>
-            <h3>참여 학생 목록 ({lobbyStudents.length}명)</h3>
-            {lobbyStudents.length === 0 ? (
-              <p>위에서 학생을 추가하거나 템플릿을 불러오세요.</p>
-            ) : (
-              <ul style={{ listStyle: 'none', paddingLeft: '0' }}>
-                {lobbyStudents.map(student => (
-                  <li key={student.id} style={styles.lobbyItem}>
-                    <span>{student.name}</span>
-                    <button
-                      onClick={() => handleRemoveStudent(student.id)}
-                      style={styles.removeButton}
-                      disabled={startSessionLoading || loading}
-                    >
-                      제거
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          {/* === 세션 이름 입력 (추가됨) === */}
-           <div style={styles.section}>
-               <h3>수업 이름 (선택 사항)</h3>
-               <input
-                   type="text"
-                   value={sessionName}
-                   onChange={(e) => setSessionName(e.target.value)}
-                   placeholder="예: 3월 1주차 수학 보충"
-                   style={{...styles.input, width: 'calc(100% - 28px)'}} // 너비 조정
-                   disabled={startSessionLoading || loading}
-               />
-           </div>
-
-
-          {/* === 수업 시작 버튼 === */}
-          <button
-            onClick={handleStartClass}
-            // 로비에 학생 없거나, 세션 시작 중이거나, 초기 로딩 중일 때 비활성화
-            disabled={lobbyStudents.length === 0 || startSessionLoading || loading}
-            style={(lobbyStudents.length === 0 || startSessionLoading || loading) ? styles.disabledButton : styles.startButton}
-          >
-            {startSessionLoading ? '수업 시작 처리 중...' : `수업 시작 (${lobbyStudents.length}명)`}
-          </button>
-        </>
+      {/* === 템플릿(그룹) 불러오기 === */}
+      {groups.length > 0 && (
+        <div style={styles.section}>
+          <h3>템플릿 불러오기</h3>
+          {groups.map(group => (
+            <button
+                key={group.id}
+                onClick={() => handleLoadTemplate(group.id)}
+                style={styles.button}
+                disabled={startSessionLoading}
+            >
+              {group.name} 불러오기
+            </button>
+          ))}
+        </div>
       )}
+      {groups.length === 0 && !error && <p>사용 가능한 템플릿(그룹)이 없습니다.</p>}
+
+      {/* === 학생 검색 및 추가 === */}
+      <div style={styles.section}>
+        <h3>학생 검색 및 추가</h3>
+        <input
+          type="text"
+          placeholder="학생 이름 검색"
+          value={searchTerm}
+          onChange={handleSearchChange}
+          style={styles.input}
+          disabled={startSessionLoading || allStudents.length === 0}
+        />
+        {searchTerm && allStudents.length > 0 && (
+          <ul style={styles.list}>
+            {filteredStudents.length > 0 ? (
+              filteredStudents.map(student => (
+                <li key={student.id} style={styles.listItem}>
+                  <span>{student.name}</span>
+                  <button onClick={() => handleAddStudent(student)} style={styles.addButton} disabled={startSessionLoading}>
+                    추가
+                  </button>
+                </li>
+              ))
+            ) : (
+              <li style={styles.listItem}>검색 결과가 없습니다.</li>
+            )}
+          </ul>
+        )}
+        {allStudents.length === 0 && !error && <p style={{fontSize: '0.9em', color: '#6c757d'}}>전체 학생 목록을 불러올 수 없어 검색/추가 기능을 사용할 수 없습니다.</p>}
+      </div>
+
+      {/* === 현재 로비 학생 목록 === */}
+      <div style={styles.section}>
+        <h3>참여 학생 목록 ({lobbyStudents.length}명)</h3>
+        {lobbyStudents.length === 0 ? (
+          <p>위에서 학생을 추가하거나 템플릿을 불러오세요.</p>
+        ) : (
+          <ul style={{ listStyle: 'none', paddingLeft: '0' }}>
+            {lobbyStudents.map(student => (
+              <li key={student.id} style={styles.lobbyItem}>
+                <span>{student.name}</span>
+                <button
+                  onClick={() => handleRemoveStudent(student.id)}
+                  style={styles.removeButton}
+                  disabled={startSessionLoading}
+                >
+                  제거
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* === 세션 이름 입력 === */}
+       <div style={styles.section}>
+           <h3>수업 이름 (선택 사항)</h3>
+           <input
+               type="text"
+               value={sessionName}
+               onChange={(e) => setSessionName(e.target.value)}
+               placeholder="예: 3월 1주차 수학 보충"
+               style={{...styles.input, width: 'calc(100% - 28px)'}}
+               disabled={startSessionLoading}
+           />
+       </div>
+
+      {/* === 수업 시작 버튼 === */}
+      <button
+        onClick={handleStartClass}
+        disabled={lobbyStudents.length === 0 || startSessionLoading}
+        style={(lobbyStudents.length === 0 || startSessionLoading) ? styles.disabledButton : styles.startButton}
+      >
+        {startSessionLoading ? '수업 시작 처리 중...' : `수업 시작 (${lobbyStudents.length}명)`}
+      </button>
     </div>
   );
 }
 
-// --- 스타일 객체 (변경 없음) ---
 const styles = {
     container: { padding: '20px', fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif' },
     section: { marginBottom: '25px', paddingBottom: '15px', borderBottom: '1px solid #eee' },
@@ -303,7 +326,6 @@ const styles = {
     startButton: { padding: '12px 25px', fontSize: '16px', cursor: 'pointer', background: '#0d6efd', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold', width: '100%', marginTop: '10px' },
     disabledButton: { padding: '12px 25px', fontSize: '16px', cursor: 'not-allowed', background: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold', opacity: 0.65, width: '100%', marginTop: '10px' }
   };
-// -------------------------------------------
 
 export default ClassPreparation;
 // --- 여기까지 복사 ---

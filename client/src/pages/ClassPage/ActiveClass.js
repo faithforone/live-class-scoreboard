@@ -62,39 +62,85 @@ function ActiveClass() {
   // Socket event listeners
   useEffect(() => {
     if (socket && isConnected && session?.id) {
-      console.log(`ActiveClass: Socket connected for session ${session.id}`);
+      console.log(`[ActiveClass] === SOCKET SETUP === Socket connected for session ${session.id}, socket ID: ${socket.id}`);
       
-      const handleScoreUpdate = (data) => {
-        console.log('ActiveClass: Score update received via socket:', data);
-        if (data.sessionId === session.id) {
+      const currentSessionId = parseInt(session.id, 10); // Ensure numeric type
+      
+      const handleScoreUpdate = (dataFromServer) => {
+        console.log('[ActiveClass] === SCORE UPDATE EVENT RECEIVED ===');
+        console.log('[ActiveClass] Raw data from server:', dataFromServer);
+        console.log(`[ActiveClass] Current component session ID: ${currentSessionId}`);
+        
+        // Data validation check
+        if (!dataFromServer || dataFromServer.sessionId === undefined || 
+            dataFromServer.studentId === undefined || dataFromServer.newScore === undefined) {
+          console.warn('[ActiveClass] Received incomplete scoreUpdate data:', dataFromServer);
+          return;
+        }
+        
+        const eventSessionId = parseInt(dataFromServer.sessionId, 10); // Convert to number
+        
+        if (eventSessionId === currentSessionId) {
+          console.log(`[ActiveClass] Event matches current session. Updating UI for student: ${dataFromServer.studentId}`);
+          
+          // React state update with proper immutability
           setSession(prevSession => {
-            if (!prevSession) return null;
-            return {
+            // Safety check for race conditions
+            if (!prevSession || prevSession.id !== currentSessionId) {
+              console.warn('[ActiveClass] Mismatch or null prevSession during UI update. Aborting.');
+              return prevSession; 
+            }
+            
+            const updatedParticipants = prevSession.sessionParticipants.map(participant => {
+              // Convert to number for safe comparison
+              const participantStudentId = parseInt(participant.studentId, 10);
+              const updateStudentId = parseInt(dataFromServer.studentId, 10);
+              
+              if (participantStudentId === updateStudentId) {
+                // Create a new object for this participant with updated score
+                return { ...participant, score: dataFromServer.newScore };
+              }
+              return participant; // Return others unchanged
+            });
+            
+            const newSessionState = {
               ...prevSession,
-              sessionParticipants: prevSession.sessionParticipants.map(p =>
-                p.studentId === data.studentId
-                  ? { ...p, score: data.newScore }
-                  : p
-              )
+              sessionParticipants: updatedParticipants
             };
+            console.log('[ActiveClass] New local session state after update:', newSessionState);
+            return newSessionState;
           });
+        } else {
+          console.log(`[ActiveClass] ScoreUpdate event for different session (${eventSessionId}) ignored.`);
         }
       };
       
       const handleSessionEnded = (data) => {
-        console.log('ActiveClass: sessionEnded event received', data);
-        // Either check for matching sessionId in data or just navigate away
+        console.log('[ActiveClass] sessionEnded event received', data);
         alert('수업이 종료되었습니다.');
         navigate('/teacher/prepare');
       };
       
+      console.log(`[ActiveClass] Attaching 'scoreUpdate' listener for session ${currentSessionId}. Socket ID: ${socket.id}`);
       socket.on('scoreUpdate', handleScoreUpdate);
       socket.on('sessionEnded', handleSessionEnded);
       
+      // Room subscription - ensure we're in the correct room
+      if (socket.connected) {
+        console.log(`[ActiveClass] Ensuring room subscription for session-${currentSessionId}`);
+        socket.emit('joinSession', currentSessionId);
+      }
+      
       return () => {
+        console.log(`[ActiveClass] Detaching 'scoreUpdate' listener for session ${currentSessionId}. Socket ID: ${socket.id}`);
         socket.off('scoreUpdate', handleScoreUpdate);
         socket.off('sessionEnded', handleSessionEnded);
       };
+    } else {
+      // Log when socket connection conditions are not met
+      if (session?.id) { 
+        console.log(`[ActiveClass] Did not attach 'scoreUpdate' listener. Socket available: ${!!socket}, Connected: ${isConnected}. Session ID: ${session.id}`);
+      }
     }
   }, [socket, isConnected, session, navigate]);
   
@@ -118,11 +164,13 @@ function ActiveClass() {
     
     try {
       setSubmitting(true);
+      console.log(`[ActiveClass] Calling API to update score for student ${studentId}, points ${pointsValue} in session ${session.id}`);
       // Make API call (server will emit socket events to all clients)
-      await teacherService.updateScore(session.id, studentId, pointsValue);
+      const result = await teacherService.updateScore(session.id, studentId, pointsValue);
+      console.log(`[ActiveClass] Score update API call successful:`, result);
       // Success - the socket event will confirm the update to all clients
     } catch (err) {
-      console.error('Error awarding points:', err);
+      console.error('[ActiveClass] Error awarding points:', err);
       alert('점수 부여 중 오류가 발생했습니다: ' + (err.message || '알 수 없는 오류'));
       // Rollback to original state on error
       setSession(prevSession => ({ ...prevSession, sessionParticipants: originalParticipants }));

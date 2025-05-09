@@ -519,7 +519,7 @@ exports.updateScore = async (req, res) => {
     // 5. WebSocket으로 점수 업데이트 알림
     try {
       const io = req.app.get('io');
-      console.log('Socket.io instance available:', !!io);
+      console.log('[teacherController] Socket.io instance available:', !!io);
       
       if (io) {
         const studentName = participant.student ? participant.student.name : 'Unknown';
@@ -535,42 +535,52 @@ exports.updateScore = async (req, res) => {
           timestamp: scoreLog.timestamp
         };
         
-        // 룸 이름 생성
-        const sessionRoomName = `session-${sessionId}`;
-        const feedRoomName = currentUrlIdentifier ? `feed-${currentUrlIdentifier}` : null;
-        
-        console.log(`Emitting to socket rooms: ${sessionRoomName}, ${feedRoomName || 'N/A'}`);
-        
-        // 1. /score-feed 네임스페이스의 세션 룸으로 이벤트 전송
-        if (io.of && typeof io.of === 'function') {
-          // 세션 룸으로 이벤트 전송
-          io.of('/score-feed').to(sessionRoomName).emit('scoreUpdate', payload);
-          console.log(`Emitted 'scoreUpdate' to room ${sessionRoomName} in /score-feed namespace`);
-          
-          // URL 식별자가 있으면 피드 룸으로도 이벤트 전송
-          if (feedRoomName) {
-            io.of('/score-feed').to(feedRoomName).emit('scoreUpdate', payload);
-            console.log(`Emitted 'scoreUpdate' to room ${feedRoomName} in /score-feed namespace`);
-          }
+        // Use the broadcastScoreUpdate utility if available
+        if (io.broadcastScoreUpdate) {
+          console.log('[teacherController] Using broadcastScoreUpdate utility');
+          const result = io.broadcastScoreUpdate(payload, sessionId, currentUrlIdentifier);
+          console.log('[teacherController] Broadcast result:', result);
         } else {
-          // io.of가 없으면 대체 방식 시도
-          console.log('Using fallback socket broadcasting method');
-          if (io.to && typeof io.to === 'function') {
-            io.to(sessionRoomName).emit('scoreUpdate', payload);
+          // Fallback to previous implementation
+          console.log('[teacherController] Fallback to direct emission');
+          
+          // 룸 이름 생성
+          const sessionRoomName = `session-${sessionId}`;
+          const feedRoomName = currentUrlIdentifier ? `feed-${currentUrlIdentifier}` : null;
+          
+          console.log(`[teacherController] Emitting to socket rooms: ${sessionRoomName}, ${feedRoomName || 'N/A'}`);
+          
+          // 1. /score-feed 네임스페이스의 세션 룸으로 이벤트 전송
+          if (io.of && typeof io.of === 'function') {
+            // 세션 룸으로 이벤트 전송
+            io.of('/score-feed').to(sessionRoomName).emit('scoreUpdate', payload);
+            console.log(`[teacherController] Emitted 'scoreUpdate' to room ${sessionRoomName} in /score-feed namespace`);
+            
+            // URL 식별자가 있으면 피드 룸으로도 이벤트 전송
             if (feedRoomName) {
-              io.to(feedRoomName).emit('scoreUpdate', payload);
+              io.of('/score-feed').to(feedRoomName).emit('scoreUpdate', payload);
+              console.log(`[teacherController] Emitted 'scoreUpdate' to room ${feedRoomName} in /score-feed namespace`);
             }
           } else {
-            // 마지막 대안: 모든 클라이언트에게 브로드캐스트
-            io.emit('scoreUpdate', payload);
-            console.log('Broadcast scoreUpdate to all clients (fallback)');
+            // io.of가 없으면 대체 방식 시도
+            console.log('[teacherController] Using fallback socket broadcasting method');
+            if (io.to && typeof io.to === 'function') {
+              io.to(sessionRoomName).emit('scoreUpdate', payload);
+              if (feedRoomName) {
+                io.to(feedRoomName).emit('scoreUpdate', payload);
+              }
+            } else {
+              // 마지막 대안: 모든 클라이언트에게 브로드캐스트
+              io.emit('scoreUpdate', payload);
+              console.log('[teacherController] Broadcast scoreUpdate to all clients (fallback)');
+            }
           }
         }
       } else {
-        console.warn('Socket.io instance not available, skipping real-time update');
+        console.warn('[teacherController] Socket.io instance not available, skipping real-time update');
       }
     } catch (socketError) {
-      console.error('Error emitting socket event:', socketError);
+      console.error('[teacherController] Error emitting socket event:', socketError);
       // Socket 오류가 발생해도 API 응답은 성공으로 처리
     }
 

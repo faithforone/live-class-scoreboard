@@ -1,3 +1,17 @@
+/* Add split container styles */
+.feed-container-split {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', sans-serif;
+  color: #333;
+  background-color: #f9f9f9;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Maintain original .feed-container for backward compatibility */
 .feed-container {
   max-width: 800px;
   margin: 0 auto;
@@ -61,6 +75,141 @@
   100% {
     box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
   }
+}
+
+/* New split layout styles */
+.feed-main-content {
+  display: flex;
+  flex-direction: row;
+  gap: 20px;
+  flex: 1;
+  margin-top: 10px;
+}
+
+/* Left side: Participants scores/ranking */
+.participants-scores-section {
+  flex: 0 0 300px;
+  background-color: #ffffff;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.participants-scores-section h2 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 1.3rem;
+  color: #334155;
+  text-align: center;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed #e2e8f0;
+}
+
+.participants-list-ranked {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.participant-item-ranked {
+  display: flex;
+  align-items: center;
+  padding: 12px 8px;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.participant-item-ranked:last-child {
+  border-bottom: none;
+}
+
+.participant-item-ranked:hover {
+  background-color: #f8fafc;
+}
+
+.rank-badge-feed {
+  font-size: 0.9em;
+  font-weight: 700;
+  color: #64748b;
+  width: 30px;
+  text-align: center;
+  margin-right: 10px;
+}
+
+/* Special styles for top 3 ranks */
+.participant-item-ranked.rank-1 .rank-badge-feed { color: #f59e0b; }
+.participant-item-ranked.rank-2 .rank-badge-feed { color: #78716c; }
+.participant-item-ranked.rank-3 .rank-badge-feed { color: #a16207; }
+
+.participant-item-ranked.rank-1 { background-color: #fffbeb; }
+.participant-item-ranked.current-top { font-weight: bold; }
+
+.name-ranked {
+  flex-grow: 1;
+  font-size: 1rem;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.score-ranked {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #4f46e5;
+  min-width: 50px;
+  text-align: right;
+}
+
+/* Right side: Score updates log */
+.score-updates-log-section {
+  flex: 1;
+  background-color: #ffffff;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.score-updates-log-section h2 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 1.3rem;
+  color: #334155;
+  text-align: center;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed #e2e8f0;
+}
+
+/* No data placeholders */
+.no-data-placeholder {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 30px 20px;
+  color: #94a3b8;
+  text-align: center;
+  font-size: 0.9rem;
+  font-style: italic;
+  border: 1px dashed #e2e8f0;
+  border-radius: 6px;
+  margin: 10px 0;
+}
+
+/* Error message when session is active */
+.feed-error-inline {
+  background-color: #fee2e2;
+  color: #b91c1c;
+  padding: 10px 15px;
+  border-radius: 6px;
+  margin: 0 0 15px 0;
+  text-align: center;
+  font-weight: 500;
 }
 
 .feed-content {
@@ -249,6 +398,7 @@
 .error-icon, .not-found-icon {
   font-size: 3rem;
   margin-bottom: 20px;
+  color: #e53935;
 }
 
 .identifier-info {
@@ -256,13 +406,30 @@
   padding: 8px 12px;
   background-color: #f5f5f5;
   border-radius: 4px;
-  font-family: monospace;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
+  color: #555;
 }
 
-/* Mobile Responsive */
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .feed-main-content {
+    flex-direction: column;
+  }
+  
+  .participants-scores-section {
+    flex: 0 0 auto;
+    max-height: 40vh;
+    margin-bottom: 15px;
+  }
+  
+  .score-updates-log-section {
+    flex: 1;
+    max-height: 50vh;
+  }
+}
+
 @media (max-width: 576px) {
-  .feed-container {
+  .feed-container, .feed-container-split {
     padding: 10px;
   }
   
@@ -272,7 +439,7 @@
   }
   
   .connection-status {
-    margin-top: 10px;
+    margin-top: 8px;
   }
   
   .update-item {
@@ -280,10 +447,10 @@
   }
   
   .student-name {
-    font-size: 0.95rem;
+    font-size: 0.9rem;
   }
   
   .change-value {
-    font-size: 1.2rem;
+    font-size: 1.3rem;
   }
 } 
