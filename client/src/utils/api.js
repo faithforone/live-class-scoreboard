@@ -4,9 +4,13 @@ import axios from 'axios';
 const TEACHER_TOKEN_KEY = 'teacherToken';
 const ADMIN_TOKEN_KEY = 'adminAuth'; // 관리자 토큰 키 추가
 
+// 로컬 네트워크에서 접근할 서버의 IP 주소 (임시 설정)
+const LOCAL_SERVER_IP = '172.30.1.75'; // 현재 컴퓨터의 로컬 IP 주소
+
 // 기본 API 클라이언트 설정
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5001/api',
+  // 로컬 네트워크에서 접근할 수 있도록 직접 IP 주소 지정
+  baseURL: `http://${LOCAL_SERVER_IP}:5001/api`,
   headers: {
     'Content-Type': 'application/json'
   }

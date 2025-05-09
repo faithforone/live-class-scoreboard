@@ -329,6 +329,9 @@ exports.endClassSession = async (req, res) => {
       return res.status(400).json({ message: session.status === '종료됨' ? '이미 종료된 수업 세션입니다.' : '활성 상태인 세션만 종료할 수 있습니다.' });
     }
 
+    // URL 식별자 확인 (socket.io 이벤트를 위해 필요)
+    const urlIdentifier = session.url_identifier || session.urlIdentifier;
+
     // classSession.js 모델 필드 'status', 'endTime' 확인
     await session.update(
       { status: '종료됨', endTime: new Date() }, // 사용자의 '종료됨' 상태 유지
@@ -345,12 +348,55 @@ exports.endClassSession = async (req, res) => {
     await t.commit();
     console.log(`Session ${sessionId} ended successfully. Updated ${updatedStudentCount[0]} students.`);
 
-    // Socket.IO로 세션 종료 알림 (선택적)
-    const io = req.app.get('io');
-    if (io && session.urlIdentifier) {
-        io.to(`session-${sessionId}`).emit('sessionEnded'); // 세션 내부 룸
-        io.to(`feed-${session.urlIdentifier}`).emit('sessionEnded'); // 공개 피드/위젯 룸
-        console.log(`Emitted sessionEnded event for session ${sessionId}`);
+    // Socket.IO로 세션 종료 알림
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        const sessionRoomName = `session-${sessionId}`;
+        const feedRoomName = urlIdentifier ? `feed-${urlIdentifier}` : null;
+        
+        const endSessionPayload = {
+          sessionId: parseInt(sessionId, 10),
+          message: '수업이 종료되었습니다.',
+          timestamp: new Date().toISOString()
+        };
+        
+        console.log(`Emitting sessionEnded events for session ${sessionId}`);
+        
+        // 1. /score-feed 네임스페이스로 이벤트 전송
+        if (io.of && typeof io.of === 'function') {
+          // 세션 룸으로 이벤트 전송
+          io.of('/score-feed').to(sessionRoomName).emit('sessionEnded', endSessionPayload);
+          console.log(`Emitted 'sessionEnded' to room ${sessionRoomName} in /score-feed namespace`);
+          
+          // URL 식별자가 있으면 피드 룸으로도 이벤트 전송
+          if (feedRoomName) {
+            io.of('/score-feed').to(feedRoomName).emit('sessionEnded', endSessionPayload);
+            console.log(`Emitted 'sessionEnded' to room ${feedRoomName} in /score-feed namespace`);
+          }
+          
+          // 전체 /score-feed 네임스페이스에 브로드캐스트 (모든 클라이언트가 알 수 있도록)
+          io.of('/score-feed').emit('sessionEnded', endSessionPayload);
+        } else {
+          // io.of가 없으면 대체 방식 시도
+          console.log('Using fallback socket broadcasting method for sessionEnded');
+          if (io.to && typeof io.to === 'function') {
+            io.to(sessionRoomName).emit('sessionEnded', endSessionPayload);
+            if (feedRoomName) {
+              io.to(feedRoomName).emit('sessionEnded', endSessionPayload);
+            }
+          }
+          
+          // 모든 클라이언트에게 브로드캐스트
+          io.emit('sessionEnded', endSessionPayload);
+          console.log('Broadcast sessionEnded to all clients');
+        }
+      } else {
+        console.warn('Socket.io instance not available, skipping sessionEnded event');
+      }
+    } catch (socketError) {
+      console.error('Error emitting sessionEnded event:', socketError);
+      // Socket 오류가 발생해도 API 응답은 성공으로 처리
     }
 
     res.status(200).json({ message: '수업 세션이 종료되었습니다.' });
@@ -420,7 +466,7 @@ exports.updateScore = async (req, res) => {
   if (!sessionId || !studentId || points === undefined) {
     return res.status(400).json({ message: '세션 ID, 학생 ID, 점수는 필수 항목입니다.' });
   }
-  const parsedPoints = parseInt(points);
+  const parsedPoints = parseInt(points, 10); // 10진수로 명시
   if (isNaN(parsedPoints)) {
       return res.status(400).json({ message: '점수는 숫자여야 합니다.' });
   }
@@ -435,10 +481,11 @@ exports.updateScore = async (req, res) => {
       return res.status(400).json({ message: '활성 상태인 수업 세션이 아닙니다.' });
     }
 
-    console.log('Got session with identifier:', session.url_identifier);
+    // URL 식별자 확인 (url_identifier 또는 urlIdentifier)
+    const currentUrlIdentifier = session.url_identifier || session.urlIdentifier;
+    console.log('Got session with identifier:', currentUrlIdentifier);
     
     // 2. 해당 세션에 참여 중인 학생(SessionParticipant) 찾기
-    // sessionParticipant.js 모델 FK 이름 'sessionId', 'studentId' 확인
     const participant = await db.SessionParticipant.findOne({
       where: {
         sessionId: sessionId,
@@ -459,12 +506,10 @@ exports.updateScore = async (req, res) => {
     await participant.update({ score: newScore }, { transaction: t });
 
     // 4. ScoreLog 생성 (SessionParticipant ID 사용)
-    // scoreLog.js 모델 FK 이름 'participantId', 필드 'change', 'timestamp' 확인
     const scoreLog = await db.ScoreLog.create({
-      participantId: participant.id, // SessionParticipant의 PK 사용
-      change: parsedPoints,          // 점수 변화량 기록
+      participantId: participant.id,
+      change: parsedPoints,
       timestamp: new Date()
-      // teacher_identifier 필드는 모델에 없으므로 제거
     }, { transaction: t });
 
     await t.commit(); // 모든 작업 성공 시 커밋
@@ -479,9 +524,9 @@ exports.updateScore = async (req, res) => {
       if (io) {
         const studentName = participant.student ? participant.student.name : 'Unknown';
         const payload = {
-          sessionId: sessionId,
+          sessionId: parseInt(sessionId, 10), // 숫자형으로 보장
           participantId: participant.id,
-          studentId: studentId,
+          studentId: parseInt(studentId, 10), // 숫자형으로 보장
           studentName: studentName,
           points: parsedPoints,
           change: parsedPoints,
@@ -490,47 +535,49 @@ exports.updateScore = async (req, res) => {
           timestamp: scoreLog.timestamp
         };
         
-        // Create room names
-        const sessionRoom = `session-${sessionId}`;
-        const feedRoom = `feed-${session.url_identifier}`;
+        // 룸 이름 생성
+        const sessionRoomName = `session-${sessionId}`;
+        const feedRoomName = currentUrlIdentifier ? `feed-${currentUrlIdentifier}` : null;
         
-        console.log(`Emitting to socket rooms: ${sessionRoom}, ${feedRoom}`);
+        console.log(`Emitting to socket rooms: ${sessionRoomName}, ${feedRoomName || 'N/A'}`);
         
-        // Get all namespaces from io object
-        const mainIo = io.io || io; // Handle both cases: when io is the main object or when it's the returned object from setupSocket
-        
-        // 1. Emit to main namespace rooms
-        mainIo.to(sessionRoom).emit('scoreUpdate', payload);
-        mainIo.to(feedRoom).emit('scoreUpdate', payload);
-        
-        // 2. Emit to all connected clients on main namespace
-        mainIo.emit('scoreUpdate', payload);
-        
-        // 3. If scoreFeed namespace exists, emit there too
-        if (io.scoreFeed) {
-          io.scoreFeed.emit('scoreUpdate', payload);
-          io.scoreFeed.to(sessionRoom).emit('scoreUpdate', payload);
+        // 1. /score-feed 네임스페이스의 세션 룸으로 이벤트 전송
+        if (io.of && typeof io.of === 'function') {
+          // 세션 룸으로 이벤트 전송
+          io.of('/score-feed').to(sessionRoomName).emit('scoreUpdate', payload);
+          console.log(`Emitted 'scoreUpdate' to room ${sessionRoomName} in /score-feed namespace`);
+          
+          // URL 식별자가 있으면 피드 룸으로도 이벤트 전송
+          if (feedRoomName) {
+            io.of('/score-feed').to(feedRoomName).emit('scoreUpdate', payload);
+            console.log(`Emitted 'scoreUpdate' to room ${feedRoomName} in /score-feed namespace`);
+          }
+        } else {
+          // io.of가 없으면 대체 방식 시도
+          console.log('Using fallback socket broadcasting method');
+          if (io.to && typeof io.to === 'function') {
+            io.to(sessionRoomName).emit('scoreUpdate', payload);
+            if (feedRoomName) {
+              io.to(feedRoomName).emit('scoreUpdate', payload);
+            }
+          } else {
+            // 마지막 대안: 모든 클라이언트에게 브로드캐스트
+            io.emit('scoreUpdate', payload);
+            console.log('Broadcast scoreUpdate to all clients (fallback)');
+          }
         }
-        
-        // 4. Broadcast to all namespaces (as a fallback)
-        Object.keys(mainIo.nsps || {}).forEach(namespace => {
-          console.log(`Broadcasting to namespace: ${namespace}`);
-          mainIo.of(namespace).emit('scoreUpdate', payload);
-        });
-        
-        console.log('Socket.io message emitted to all possible targets');
       } else {
         console.warn('Socket.io instance not available, skipping real-time update');
       }
     } catch (socketError) {
       console.error('Error emitting socket event:', socketError);
-      // Don't fail the request if socket emission fails
+      // Socket 오류가 발생해도 API 응답은 성공으로 처리
     }
 
     res.status(200).json({
       message: '점수가 업데이트되었습니다.',
       participantId: participant.id,
-      studentId: studentId,
+      studentId: parseInt(studentId, 10),
       newScore: newScore,
       logId: scoreLog.id
     });

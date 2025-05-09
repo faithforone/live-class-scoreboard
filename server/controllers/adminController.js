@@ -616,17 +616,26 @@ exports.resetScores = async (req, res) => {
     
     let whereClause = {};
     
+    // type이 'all'이면 모든 점수를 초기화 (빈 whereClause 사용)
+    if (type === 'all') {
+      // 모든 점수 초기화 - 빈 whereClause 유지
+    }
     // 특정 학생들만 초기화
-    if (studentIds && studentIds.length > 0) {
+    else if (studentIds && studentIds.length > 0) {
       whereClause.studentId = studentIds;  // snake_case에서 camelCase로 변경
     }
-    
     // 특정 기간 초기화
-    if (type === 'period' && startDate && endDate) {
+    else if (type === 'period' && startDate && endDate) {
       whereClause.timestamp = {
         [sequelize.Op.between]: [new Date(startDate), new Date(endDate)]
       };
     }
+    
+    // 세션 참가자 점수 초기화
+    await SessionParticipant.update({ score: 0 }, { 
+      where: {},
+      transaction: t 
+    });
     
     // 점수 로그 삭제
     const deletedCount = await ScoreLog.destroy({

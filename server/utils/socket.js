@@ -4,17 +4,18 @@ const { ClassSession, Student, ScoreLog } = require('../models');
 module.exports = (server) => {
   const io = socketIo(server, {
     cors: {
-      origin: process.env.NODE_ENV === 'production' 
-        ? ['https://your-production-domain.com'] 
-        : ['http://localhost:3000'],
+      // 임시로 모든 출처 허용 (로컬 네트워크 사용을 위함)
+      // 실제 프로덕션 환경에서는 이렇게 하면 안됨!
+      origin: "*",
       methods: ['GET', 'POST'],
-      credentials: true
+      credentials: true,
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Auth-Token']
     }
   });
 
   // Main socket connection for all clients
   io.on('connection', (socket) => {
-    console.log('New client connected:', socket.id);
+    console.log('New client connected to default namespace:', socket.id);
     
     // Handle ping for keepalive
     socket.on('ping', () => {
@@ -24,7 +25,10 @@ module.exports = (server) => {
     
     // Handle joinFeed event for feed pages
     socket.on('joinFeed', (urlIdentifier) => {
-      if (!urlIdentifier) return;
+      if (!urlIdentifier) {
+        console.log(`Socket ${socket.id} tried to join feed with invalid urlIdentifier`);
+        return;
+      }
       
       const roomName = `feed-${urlIdentifier}`;
       socket.join(roomName);
@@ -49,7 +53,10 @@ module.exports = (server) => {
     
     // Handle join session event
     socket.on('joinSession', (sessionId) => {
-      if (!sessionId) return;
+      if (!sessionId) {
+        console.log(`Socket ${socket.id} tried to join session with invalid sessionId`);
+        return;
+      }
       
       const roomName = `session-${sessionId}`;
       socket.join(roomName);
@@ -62,8 +69,8 @@ module.exports = (server) => {
       });
     });
     
-    socket.on('disconnect', () => {
-      console.log('Client disconnected:', socket.id);
+    socket.on('disconnect', (reason) => {
+      console.log(`Client ${socket.id} disconnected. Reason: ${reason}`);
     });
   });
 
@@ -72,15 +79,45 @@ module.exports = (server) => {
   scoreFeed.on('connection', (socket) => {
     console.log('사용자가 점수 피드에 연결됨:', socket.id);
 
+    // Handle joinFeed event for feed pages
+    socket.on('joinFeed', (urlIdentifier) => {
+      if (!urlIdentifier) {
+        console.log(`Socket ${socket.id} tried to join feed with invalid urlIdentifier in /score-feed namespace`);
+        return;
+      }
+      
+      const roomName = `feed-${urlIdentifier}`;
+      socket.join(roomName);
+      console.log(`Socket ${socket.id} joined feed room: ${roomName} in /score-feed namespace`);
+      
+      // Send diagnostic message to confirm room join
+      socket.emit('roomJoined', { 
+        room: roomName, 
+        message: 'Successfully joined feed room in /score-feed namespace' 
+      });
+    });
+
     // 특정 세션의 피드 구독
     socket.on('joinSession', (sessionId) => {
-      socket.join(`session-${sessionId}`);
-      console.log(`소켓 ${socket.id}가 세션 ${sessionId}에 참여함`);
+      if (!sessionId) {
+        console.log(`Socket ${socket.id} tried to join session with invalid sessionId in /score-feed namespace`);
+        return;
+      }
+      
+      const roomName = `session-${sessionId}`;
+      socket.join(roomName);
+      console.log(`Socket ${socket.id} joined session room: ${roomName} in /score-feed namespace`);
+      
+      // Send diagnostic message to confirm room join
+      socket.emit('roomJoined', { 
+        room: roomName, 
+        message: 'Successfully joined session room in /score-feed namespace' 
+      });
     });
 
     // 연결 종료
-    socket.on('disconnect', () => {
-      console.log('사용자가 점수 피드 연결 해제:', socket.id);
+    socket.on('disconnect', (reason) => {
+      console.log(`사용자가 점수 피드 연결 해제: ${socket.id}, reason: ${reason}`);
     });
   });
 
@@ -90,65 +127,15 @@ module.exports = (server) => {
     console.log('사용자가 랭킹 피드에 연결됨:', socket.id);
 
     // 연결 종료
-    socket.on('disconnect', () => {
-      console.log('사용자가 랭킹 피드 연결 해제:', socket.id);
+    socket.on('disconnect', (reason) => {
+      console.log(`사용자가 랭킹 피드 연결 해제: ${socket.id}, reason: ${reason}`);
     });
   });
 
-  // 점수 업데이트 이벤트를 보내는 함수
-  const emitScoreUpdate = async (scoreLog) => {
-    try {
-      const student = await Student.findByPk(scoreLog.student_id);
-      
-      if (!student) {
-        console.error('점수 업데이트 이벤트 발송 오류: 학생을 찾을 수 없음', scoreLog.student_id);
-        return;
-      }
-      
-      // Get the session to access urlIdentifier
-      const session = await ClassSession.findByPk(scoreLog.session_id);
-      
-      if (!session) {
-        console.error('점수 업데이트 이벤트 발송 오류: 세션을 찾을 수 없음', scoreLog.session_id);
-        return;
-      }
-      
-      const payload = {
-        studentName: student.name,
-        points: scoreLog.points,
-        timestamp: scoreLog.timestamp,
-        sessionId: scoreLog.session_id,
-        studentId: student.id,
-        logId: scoreLog.id
-      };
-      
-      // Room identifiers
-      const sessionRoom = `session-${scoreLog.session_id}`;
-      const feedRoom = `feed-${session.url_identifier}`;
-      
-      console.log(`Emitting scoreUpdate to rooms: ${sessionRoom}, ${feedRoom}`);
-      
-      // 해당 세션의 피드에 점수 변동 알림
-      io.to(sessionRoom).emit('scoreUpdate', payload);
-      io.to(feedRoom).emit('scoreUpdate', payload);
-      
-      // Also emit to namespace rooms (legacy support)
-      scoreFeed.to(`session-${scoreLog.session_id}`).emit('scoreUpdate', payload);
-
-      // 랭킹 피드에도 변동 알림 (주기적 업데이트용)
-      rankingFeed.emit('scoreChanged', {
-        studentId: scoreLog.student_id,
-        sessionId: scoreLog.session_id
-      });
-    } catch (error) {
-      console.error('점수 업데이트 이벤트 발송 오류:', error);
-    }
-  };
-
+  // Export the io object and namespaces for use in controllers
   return {
     io,
     scoreFeed,
-    rankingFeed,
-    emitScoreUpdate
+    rankingFeed
   };
 };
